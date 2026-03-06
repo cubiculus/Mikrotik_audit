@@ -53,12 +53,17 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 
 ### ⚡ One-Line Install
 
+**Linux/Mac (recommended):**
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh)
+```
+
 **Windows:**
 ```powershell
 scripts\install.bat
 ```
 
-**Linux/Mac:**
+**Linux/Mac (alternative):**
 ```bash
 bash scripts/install.sh
 ```

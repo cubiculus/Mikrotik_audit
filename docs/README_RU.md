@@ -53,12 +53,17 @@
 
 ### ⚡ Установка одной командой
 
+**Linux/Mac (рекомендуется):**
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh)
+```
+
 **Windows:**
 ```powershell
 scripts\install.bat
 ```
 
-**Linux/Mac:**
+**Linux/Mac (альтернатива):**
 ```bash
 bash scripts/install.sh
 ```
