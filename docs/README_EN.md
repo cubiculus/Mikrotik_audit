@@ -2,7 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Coverage Status](https://img.shields.io/badge/coverage-coming_soon-blue)](https://codecov.io/gh/cubiculus/Mikrotik_audit)
+[![CI](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml/badge.svg)](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml)
 
 Professional automated audit tool for MikroTik RouterOS with security checks, configuration collection, and detailed report generation.
 
@@ -50,7 +51,19 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### ⚡ One-Line Install
+
+**Windows:**
+```powershell
+scripts\install.bat
+```
+
+**Linux/Mac:**
+```bash
+bash scripts/install.sh
+```
+
+### 📋 Manual Install
 
 ```bash
 # Clone repository
@@ -68,6 +81,18 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
+
+### 🎯 Quick Run
+
+**Windows:**
+```powershell
+scripts\run_audit.bat --ssh-user admin --ssh-pass your_password
+```
+
+**Linux/Mac:**
+```bash
+./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
 ```
 
 ### 2. Configuration
@@ -98,6 +123,37 @@ python mikrotik_audit.py \
     --ssh-user admin \
     --output-dir ./reports
 ```
+
+---
+
+## 📸 Screenshots
+
+### HTML Report Example
+
+![HTML Report Example](screenshots/html_report_example.png)
+
+*Example HTML report showing security issues and configuration summary*
+
+### Markdown Report Example
+
+![Markdown Report Example](screenshots/markdown_report_example.png)
+
+*Markdown report suitable for forums and documentation*
+
+> 📝 **Note:** Screenshots are for illustration. Actual report content depends on your router configuration.
+
+## 🎯 Use Cases
+
+This tool is essential for:
+
+| Scenario | Why It Matters |
+|----------|----------------|
+| **Before firmware updates** | Document current configuration state and identify potential issues before upgrading RouterOS |
+| **Handing over to another specialist** | Generate comprehensive documentation for the next administrator |
+| **Forum troubleshooting** | Share sanitized (redacted) configuration reports when asking for help on MikroTik forums |
+| **Security audits** | Automatically detect misconfigurations, weak passwords, and security vulnerabilities |
+| **Compliance documentation** | Maintain audit trails for network compliance requirements |
+| **Pre-deployment verification** | Verify router configuration before putting into production |
 
 ---
 
@@ -202,16 +258,26 @@ Mikrotik_audit/
 
 ## 🎯 CLI Parameters
 
-| Parameter | Description | Default |
-|----------|----------|--------------|
-| `--router-ip` | Router IP address or hostname | 192.168.1.1 |
-| `--ssh-port` | SSH port | 22 |
-| `--ssh-user` | SSH username | admin |
-| `--ssh-pass` | SSH password (or via MIKROTIK_PASSWORD) | - |
-| `--audit-level` | Audit level: Basic, Standard, Comprehensive | Standard |
-| `--output-dir` | Output directory for reports | Mikrotik_audit-{timestamp} |
-| `--skip-security` | Skip security analysis | False |
-| `--max-workers` | Maximum parallel threads | 5 |
+| Parameter | Description | Required | Default |
+|-----------|-------------|----------|---------|
+| `--router-ip` | Router IP address or hostname | Yes | Auto-detect |
+| `--ssh-port` | SSH port | No | 22 |
+| `--ssh-user` | SSH username | Yes | - |
+| `--ssh-pass` | SSH password | Yes* | - |
+| `--ssh-key-file` | Path to SSH private key file | No* | - |
+| `--ssh-key-passphrase` | Passphrase for SSH key | No | - |
+| `--audit-level` | Audit level: Basic, Standard, Comprehensive | No | Standard |
+| `--output-dir` | Output directory for reports | No | ./audit-reports |
+| `--skip-security` | Skip security analysis | No | False |
+| `--max-workers` | Maximum parallel threads | No | 5 |
+| `--redact` | Redact sensitive data from reports | No | False |
+
+\* Either `--ssh-pass` or `--ssh-key-file` must be provided.
+
+**Environment Variables:**
+- `MIKROTIK_PASSWORD` - SSH password
+- `MIKROTIK_SSH_KEY_FILE` - SSH key file path
+- `MIKROTIK_SSH_KEY_PASSPHRASE` - SSH key passphrase
 
 ---
 
@@ -317,6 +383,10 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) before s
 ## 📄 License
 
 This project is distributed under the MIT License - see [LICENSE](LICENSE) for details.
+
+## 📝 Changelog
+
+See [CHANGELOG.md](../CHANGELOG.md) for version history and changes.
 
 ---
 
