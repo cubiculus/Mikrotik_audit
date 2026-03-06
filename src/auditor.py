@@ -1,0 +1,310 @@
+"""MikroTik audit business logic orchestrator."""
+
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import List, Optional
+
+from colorama import Fore, Style
+
+from src.config import (
+    RouterConfig, AuditConfig, AuditLevel, CommandResult,
+    RouterInfo, BackupResult, SecurityIssue, redact_sensitive_data
+)
+from src.commands import (
+    AUDIT_COMMANDS_BASIC,
+    AUDIT_COMMANDS_STANDARD,
+    AUDIT_COMMANDS_COMPREHENSIVE,
+)
+from src.ssh_handler import SSHHandler
+from src.security_analyzer import SecurityAnalyzer
+
+logger = logging.getLogger(__name__)
+
+
+class MikroTikAuditor:
+    """Main audit orchestrator - business logic only."""
+
+    def __init__(self, config: AuditConfig):
+        """Initialize auditor."""
+        self.config = config
+        self.ssh: Optional[SSHHandler] = None
+        self.results: List[CommandResult] = []
+        self.router_info: Optional[RouterInfo] = None
+        self._security_issues: List[SecurityIssue] = []
+
+    def get_audit_commands(self) -> List[str]:
+        """Get commands based on audit level."""
+        if self.config.audit_level == AuditLevel.BASIC:
+            return AUDIT_COMMANDS_BASIC
+        elif self.config.audit_level == AuditLevel.COMPREHENSIVE:
+            return AUDIT_COMMANDS_COMPREHENSIVE
+        else:
+            return AUDIT_COMMANDS_STANDARD
+
+    def execute_command(self, index: int, command: str) -> CommandResult:
+        """Execute single command with retry logic."""
+        result = CommandResult(
+            index=index,
+            command=command,
+            attempt=0
+        )
+
+        for attempt in range(1, self.config.router.max_retries + 1):
+            result.attempt = attempt
+
+            try:
+                start_time = time.time()
+                exit_status, stdout, stderr = self.ssh.execute_command(command)  # type: ignore
+                duration = time.time() - start_time
+
+                result.exit_status = exit_status
+                result.stdout = stdout
+                result.stderr = stderr
+                result.duration = duration
+                result.has_error = exit_status != 0
+
+                if not result.has_error:
+                    logger.debug(f"[{index}] {command} - Success ({duration:.2f}s)")
+                    return result
+                else:
+                    result.error_type = "EXECUTION_ERROR"
+                    result.error_message = stderr or f"Exit code: {exit_status}"
+
+            except Exception as e:
+                result.has_error = True
+                result.error_type = type(e).__name__
+                result.error_message = str(e)
+
+                if attempt < self.config.router.max_retries:
+                    logger.warning(
+                        f"[{index}] Attempt {attempt}/{self.config.router.max_retries} "
+                        f"failed: {result.error_message}. Retrying..."
+                    )
+                    time.sleep(2 ** attempt)
+                else:
+                    logger.error(
+                        f"[{index}] All {self.config.router.max_retries} attempts failed"
+                    )
+
+        return result
+
+    def _get_optimal_workers(self) -> int:
+        """
+        Determine optimal number of workers for I/O-bound SSH tasks.
+        
+        SSH commands are network-bound (95%+ wait time), not CPU-bound.
+        RouterOS typically handles 3-5 parallel SSH sessions well.
+        """
+        command_count = len(self.get_audit_commands())
+        
+        # Base workers for I/O-bound tasks (network latency)
+        # RouterOS limits: typically 3-5 parallel SSH sessions max
+        base_workers = 4
+        
+        if command_count < 10:
+            return min(3, command_count)
+        elif command_count < 50:
+            return min(5, base_workers)
+        else:
+            # Cap at 6 for large audits to avoid overwhelming the router
+            return min(6, base_workers + 1)
+
+    def _group_commands_by_priority(self, commands: List[str]) -> dict:
+        """Group commands by priorities."""
+        fast_commands = [
+            '/system identity print',
+            '/system resource print',
+            '/system clock print',
+            '/interface print stats',
+        ]
+        heavy_commands = [
+            '/tool sniffer quick',
+            '/ip firewall filter print detail',
+            '/ip firewall nat print detail',
+        ]
+        dependent_commands = [
+            '/export hide-sensitive',
+        ]
+
+        fast = [c for c in commands if any(f in c for f in fast_commands)]
+        heavy = [c for c in commands if any(h in c for h in heavy_commands)]
+        dependent = [c for c in commands if any(d in c for d in dependent_commands)]
+        normal = [c for c in commands if c not in fast + heavy + dependent]
+
+        return {
+            'fast': fast,
+            'heavy': heavy,
+            'dependent': dependent,
+            'normal': normal
+        }
+
+    def _execute_command_group(self, commands: List[str], max_workers: int, start_idx: int, total: int):
+        """Execute a group of commands."""
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(self.execute_command, start_idx + i, cmd): (start_idx + i, cmd)
+                for i, cmd in enumerate(commands)
+            }
+
+            for future in as_completed(futures):
+                index, cmd = futures[future]
+                try:
+                    result = future.result()
+                    self.results.append(result)
+                    status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
+                    logger.info(
+                        f"[{Fore.CYAN}{index}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
+                        f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
+                    )
+                except Exception as e:
+                    logger.error(f"[{index}] Failed: {e}")
+
+    def run_audit(self) -> bool:
+        """Run complete audit."""
+        try:
+            # Connect to router
+            self.ssh = SSHHandler(self.config.router)
+            self.ssh.connect()
+
+            # Get router info
+            logger.info("Collecting router information...")
+            version_info = self.ssh.get_version_info()
+            self.router_info = RouterInfo(
+                identity=version_info.get("identity", "Unknown"),
+                model=version_info.get("model", "MikroTik Router"),
+                version=version_info.get("version", "Unknown"),
+                ip=self.config.router.router_ip,
+                uptime=version_info.get("uptime"),
+                cpu_count=version_info.get("cpu_count", 1),
+                board_name=version_info.get("board_name"),
+                architecture=version_info.get("architecture"),
+            )
+
+            logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+            logger.info(f"{Fore.CYAN}🔧 MikroTik Router Audit{Style.RESET_ALL}")
+            logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+            logger.info(f"{Fore.GREEN}✓ Connected to router:{Style.RESET_ALL} {self.router_info.identity}")
+            logger.info(f"{Fore.CYAN}  Model:{Style.RESET_ALL} {self.router_info.model}")
+            logger.info(f"{Fore.CYAN}  Version:{Style.RESET_ALL} v{self.router_info.version}")
+            logger.info(f"{Fore.CYAN}  IP:{Style.RESET_ALL} {self.router_info.ip}")
+            logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
+
+            # Get audit commands
+            commands = self.get_audit_commands()
+            total = len(commands)
+            optimal_workers = self._get_optimal_workers()
+
+            logger.info(f"\n{Fore.CYAN}📋 Audit Configuration:{Style.RESET_ALL}")
+            logger.info(f"  Level: {Fore.YELLOW}{self.config.audit_level.value}{Style.RESET_ALL}")
+            logger.info(f"  Optimal Workers: {Fore.YELLOW}{optimal_workers}{Style.RESET_ALL} (detected)")
+            logger.info(f"  Commands: {Fore.YELLOW}{total}{Style.RESET_ALL}")
+            logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
+
+            # Group commands by priority
+            grouped = self._group_commands_by_priority(commands)
+
+            # Execute by groups
+            self._execute_phase(grouped, total)
+
+            # Sort results by index
+            self.results.sort(key=lambda x: x.index)
+
+            # Apply redaction if enabled
+            if self.config.redact_sensitive:
+                logger.info("Applying sensitive data redaction...")
+                for result in self.results:
+                    if result.stdout:
+                        result.stdout = redact_sensitive_data(result.stdout)
+                    if result.stderr:
+                        result.stderr = redact_sensitive_data(result.stderr)
+
+            # Analyze security
+            security_issues = self._analyze_security()
+
+            # Prepare output directory
+            output_dir = Path(self.config.output_dir or f"mikrotik-audit-{self.get_timestamp()}")
+
+            # Return output_dir for use by caller
+            self._output_dir = output_dir
+            
+            # Perform backup and generate reports (delegated to caller)
+            return True
+
+        except Exception as e:
+            logger.error(f"Audit failed: {e}", exc_info=True)
+            return False
+        finally:
+            if self.ssh:
+                self.ssh.close()
+
+    def _execute_phase(self, grouped: dict, total: int):
+        """Execute command phases."""
+        # Phase 1: Fast commands
+        if grouped['fast']:
+            logger.info(f"\n{Fore.YELLOW}▶ Phase 1: Fast commands ({len(grouped['fast'])})...{Style.RESET_ALL}\n")
+            self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total)
+
+        # Phase 2: Heavy commands
+        if grouped['heavy']:
+            logger.info(f"\n{Fore.YELLOW}▶ Phase 2: Heavy commands ({len(grouped['heavy'])})...{Style.RESET_ALL}\n")
+            start_idx = len(grouped['fast']) + 1
+            self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), start_idx, total)
+
+        # Phase 3: Normal commands
+        if grouped['normal']:
+            logger.info(f"\n{Fore.YELLOW}▶ Phase 3: Normal commands ({len(grouped['normal'])})...{Style.RESET_ALL}\n")
+            start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
+            self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total)
+
+        # Phase 4: Dependent commands (sequential)
+        if grouped['dependent']:
+            logger.info(f"\n{Fore.YELLOW}▶ Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
+            start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
+            for cmd in grouped['dependent']:
+                result = self.execute_command(start_idx, cmd)
+                self.results.append(result)
+                status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
+                logger.info(
+                    f"[{Fore.CYAN}{start_idx}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
+                    f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
+                )
+                start_idx += 1
+
+    def _analyze_security(self) -> List[SecurityIssue]:
+        """Analyze security and return issues."""
+        if self.config.skip_security_check:
+            self._security_issues = []
+            return []
+
+        logger.info(f"\n{Fore.YELLOW}🔒 Analyzing security posture...{Style.RESET_ALL}")
+        self._security_issues = SecurityAnalyzer.analyze(self.results)
+
+        if self._security_issues:
+            logger.info(f"  {Fore.RED}⚠ Found {len(self._security_issues)} security issue(s){Style.RESET_ALL}")
+        else:
+            logger.info(f"  {Fore.GREEN}✓ No security issues found{Style.RESET_ALL}")
+
+        return self._security_issues
+
+    def get_results(self) -> List[CommandResult]:
+        """Get audit results."""
+        return self.results
+
+    def get_router_info(self) -> Optional[RouterInfo]:
+        """Get router information."""
+        return self.router_info
+
+    def get_security_issues(self) -> List[SecurityIssue]:
+        """Get security analysis results."""
+        return self._security_issues
+
+    def get_output_dir(self) -> Optional[Path]:
+        """Get output directory path."""
+        return getattr(self, '_output_dir', None)
+
+    @staticmethod
+    def get_timestamp() -> str:
+        """Get current timestamp."""
+        return time.strftime("%Y%m%d_%H%M%S")
