@@ -173,7 +173,7 @@ def main(
 
         # Perform backup
         logger.info(f"\n{Fore.YELLOW}💾 Performing system backup...{Style.RESET_ALL}")
-        backup_manager = BackupManager(auditor.ssh)  # type: ignore
+        backup_manager = BackupManager(auditor.ssh)
         backup_result = backup_manager.perform_backup(output_path)
 
         # Generate reports
@@ -186,7 +186,7 @@ def main(
         md_report = generator.generate_markdown_report(results, security_issues, router_info, backup_result)
 
         # Print summary
-        print_summary(results, security_issues, output_path, html_report, json_report, txt_report)
+        print_summary(results, security_issues, output_path, html_report, json_report, txt_report, md_report)
 
         sys.exit(0)
 
