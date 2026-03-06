@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Coverage Status](https://img.shields.io/badge/coverage-coming_soon-blue)](https://codecov.io/gh/cubiculus/Mikrotik_audit)
+[![CI](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml/badge.svg)](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml)
 
 Professional automated audit tool for MikroTik RouterOS with security checks, configuration collection, and detailed report generation.
 
@@ -39,6 +41,35 @@ python -m src.cli --ssh-user admin --ssh-key-file ~/.ssh/id_rsa
 python -m src.cli --ssh-user admin --ssh-pass your_password --redact
 ```
 
+## 📸 Screenshots
+
+### HTML Report Example
+
+![HTML Report Example](docs/screenshots/html_report_example.png)
+
+*Example HTML report showing security issues and configuration summary*
+
+### Markdown Report Example
+
+![Markdown Report Example](docs/screenshots/markdown_report_example.png)
+
+*Markdown report suitable for forums and documentation*
+
+> 📝 **Note:** Screenshots are for illustration. Actual report content depends on your router configuration.
+
+## 🎯 Use Cases
+
+This tool is essential for:
+
+| Scenario | Why It Matters |
+|----------|----------------|
+| **Before firmware updates** | Document current configuration state and identify potential issues before upgrading RouterOS |
+| **Handing over to another specialist** | Generate comprehensive documentation for the next administrator |
+| **Forum troubleshooting** | Share sanitized (redacted) configuration reports when asking for help on MikroTik forums |
+| **Security audits** | Automatically detect misconfigurations, weak passwords, and security vulnerabilities |
+| **Compliance documentation** | Maintain audit trails for network compliance requirements |
+| **Pre-deployment verification** | Verify router configuration before putting into production |
+
 ## 📁 Project Structure
 
 ```
@@ -49,6 +80,29 @@ Mikrotik_audit/
 ├── audit-reports/ # Generated reports (git-ignored)
 └── ...
 ```
+
+## ⚙️ CLI Parameters
+
+| Parameter | Description | Required | Default |
+|-----------|-------------|----------|---------|
+| `--router-ip` | Router IP address or hostname | Yes | Auto-detect |
+| `--ssh-port` | SSH port | No | 22 |
+| `--ssh-user` | SSH username | Yes | - |
+| `--ssh-pass` | SSH password | Yes* | - |
+| `--ssh-key-file` | Path to SSH private key file | No* | - |
+| `--ssh-key-passphrase` | Passphrase for SSH key | No | - |
+| `--audit-level` | Audit detail level (Basic/Standard/Comprehensive) | No | Standard |
+| `--output-dir` | Output directory for reports | No | ./audit-reports |
+| `--skip-security` | Skip security analysis | No | False |
+| `--max-workers` | Maximum parallel workers | No | 5 |
+| `--redact` | Redact sensitive data from reports | No | False |
+
+\* Either `--ssh-pass` or `--ssh-key-file` must be provided.
+
+**Environment Variables:**
+- `MIKROTIK_PASSWORD` - SSH password
+- `MIKROTIK_SSH_KEY_FILE` - SSH key file path
+- `MIKROTIK_SSH_KEY_PASSPHRASE` - SSH key passphrase
 
 ## 🔑 Features
 
