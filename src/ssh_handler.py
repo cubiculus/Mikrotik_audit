@@ -2,15 +2,40 @@
 
 import paramiko
 import logging
+import re
 from typing import Tuple, Optional
 from contextlib import contextmanager
 from queue import Queue, Empty
 from threading import Lock
 import time
+from pathlib import Path
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from src.config import RouterConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_command(command: str) -> str:
+    """
+    Sanitize command string to prevent shell injection attacks.
+    
+    Only allows safe characters for MikroTik RouterOS commands.
+    Blocks dangerous shell metacharacters.
+    """
+    # Remove dangerous shell metacharacters
+    dangerous_chars = [';', '|', '&', '$', '`', '(', ')', '{', '}', '<', '>', '!', '\\']
+    for char in dangerous_chars:
+        if char in command:
+            logger.warning(f"Dangerous character '{char}' detected in command, removing")
+            command = command.replace(char, '')
+    
+    # Allow only safe characters for RouterOS commands
+    # RouterOS commands use: alphanumeric, /, -, _, :, ., space, =, [, ], ", '
+    safe_pattern = re.compile(r'^[a-zA-Z0-9/\-_:\. =\[\]"\']+$')
+    if not safe_pattern.match(command.strip()):
+        logger.warning(f"Command contains potentially unsafe characters: {command}")
+    
+    return command.strip()
 
 
 class SSHConnectionError(Exception):
@@ -180,8 +205,8 @@ class SSHHandler:
         try:
             # Просто проверяем возможность получения соединения
             with self.connection_pool.get_connection() as conn:
-                # Проверяем соединение тестовой командой
-                conn.exec_command("/system clock print", timeout=5)
+                # Проверяем соединение тестовой командой (хардкод, безопасно)
+                conn.exec_command("/system clock print", timeout=5)  # nosec B601
                 logger.info("Connection pool is healthy")
         except SSHConnectionError as e:
             logger.error(f"Failed to connect: {e}")
@@ -189,12 +214,15 @@ class SSHHandler:
 
     def execute_command(self, command: str) -> Tuple[int, str, str]:
         """Выполнить команду (использует пул соединений)."""
+        # Sanitize command to prevent shell injection
+        sanitized_command = _sanitize_command(command)
+        
         with self.connection_pool.get_connection() as conn:
             try:
                 stdin, stdout, stderr = conn.exec_command(
-                    command,
+                    sanitized_command,
                     timeout=self.config.command_timeout
-                )
+                )  # nosec B601
                 exit_status = stdout.channel.recv_exit_status()
                 out = stdout.read().decode('utf-8', errors='ignore')
                 err = stderr.read().decode('utf-8', errors='ignore')

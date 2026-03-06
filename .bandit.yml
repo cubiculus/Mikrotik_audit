@@ -1,0 +1,20 @@
+# Bandit configuration for MikroTik Audit Tool
+# https://bandit.readthedocs.io/en/latest/config.html
+
+# Exclude test files and virtual environments
+exclude_dirs:
+  - venv
+  - .venv
+  - .pytest_cache
+  - __pycache__
+  - .git
+
+# Skip specific tests if needed (false positives)
+# skips:
+#   - B101  # assert_used
+
+# Output format
+format: screen
+
+# Report level (LOW, MEDIUM, HIGH)
+level: MEDIUM

@@ -2,7 +2,7 @@
 
 import logging
 import hashlib
-import pickle
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Any, Dict, Optional
@@ -49,11 +49,11 @@ class DataParser:
             logger.debug(f"Cache hit (memory): {cache_key[:8]}")
             return self._memory_cache[cache_key]
 
-        cache_file = self.cache_dir / f"{cache_key}.pkl"
+        cache_file = self.cache_dir / f"{cache_key}.json"
         if cache_file.exists():
             logger.debug(f"Cache hit (disk): {cache_key[:8]}")
-            with open(cache_file, 'rb') as f:
-                return pickle.load(f)
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
         return None
 
     def _save_to_cache(self, cache_key: str, data, persist: bool = False):
@@ -77,9 +77,9 @@ class DataParser:
 
         # Disk cache if persist is True
         if persist:
-            cache_file = self.cache_dir / f"{cache_key}.pkl"
-            with open(cache_file, 'wb') as f:
-                pickle.dump(data, f)
+            cache_file = self.cache_dir / f"{cache_key}.json"
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False)
 
     def build_network_overview(self, results: List[CommandResult]) -> NetworkOverview:
         """Aggregate network overview from all command results with caching."""
