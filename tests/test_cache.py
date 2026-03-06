@@ -57,20 +57,20 @@ class TestDataParserCaching(unittest.TestCase):
         """Test disk cache functionality."""
         cache_key = "test_disk_key"
         test_data = {"test": "disk_data"}
-        
+
         # Save to disk cache
         self.parser._save_to_cache(cache_key, test_data, persist=True)
-        
+
         # Check that file was created
-        cache_file = self.cache_dir / f"{cache_key}.pkl"
+        cache_file = self.cache_dir / f"{cache_key}.json"
         self.assertTrue(cache_file.exists())
-        
+
         # Create new parser instance to test disk cache
         new_parser = DataParser(cache_dir=self.cache_dir)
-        
+
         # Retrieve from disk cache
         cached_data = new_parser._get_from_cache(cache_key)
-        
+
         self.assertEqual(cached_data, test_data)
     
     def test_cache_miss(self):
@@ -150,7 +150,7 @@ class TestDataParserCaching(unittest.TestCase):
         self.assertEqual(overview2.system_identity, "TestRouter")
         
         # Verify cache files were created
-        cache_files = list(self.cache_dir.glob("*.pkl"))
+        cache_files = list(self.cache_dir.glob("*.json"))
         self.assertGreater(len(cache_files), 0)
     
     def test_cache_directory_creation(self):
