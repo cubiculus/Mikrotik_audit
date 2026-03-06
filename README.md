@@ -2,8 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Coverage Status](https://img.shields.io/badge/coverage-coming_soon-blue)](https://codecov.io/gh/cubiculus/Mikrotik_audit)
+[![Coverage](https://codecov.io/gh/cubiculus/Mikrotik_audit/graph/badge.svg)](https://codecov.io/gh/cubiculus/Mikrotik_audit)
 [![CI](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml/badge.svg)](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/cubiculus/Mikrotik_audit)](https://github.com/cubiculus/Mikrotik_audit/releases)
+[![Issues](https://img.shields.io/github/issues/cubiculus/Mikrotik_audit)](https://github.com/cubiculus/Mikrotik_audit/issues)
+[![Contributors](https://img.shields.io/github/contributors/cubiculus/Mikrotik_audit)](https://github.com/cubiculus/Mikrotik_audit/graphs/contributors)
 
 Professional automated audit tool for MikroTik RouterOS with security checks, configuration collection, and detailed report generation.
 

@@ -2,7 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Coverage Status](https://img.shields.io/badge/coverage-coming_soon-blue)](https://codecov.io/gh/cubiculus/Mikrotik_audit)
+[![CI](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml/badge.svg)](https://github.com/cubiculus/Mikrotik_audit/actions/workflows/ci.yml)
 
 Профессиональный инструмент для автоматизированного аудита MikroTik RouterOS с проверкой безопасности, сбором конфигурации и генерацией подробных отчетов.
 
@@ -50,7 +51,19 @@
 
 ## 🚀 Быстрый старт
 
-### 1. Установка
+### ⚡ Установка одной командой
+
+**Windows:**
+```powershell
+scripts\install.bat
+```
+
+**Linux/Mac:**
+```bash
+bash scripts/install.sh
+```
+
+### 📋 Ручная установка
 
 ```bash
 # Клонирование репозитория
@@ -68,6 +81,18 @@ source venv/bin/activate
 
 # Установка зависимостей
 pip install -r requirements.txt
+```
+
+### 🎯 Быстрый запуск
+
+**Windows:**
+```powershell
+scripts\run_audit.bat --ssh-user admin --ssh-pass your_password
+```
+
+**Linux/Mac:**
+```bash
+./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
 ```
 
 ### 2. Настройка
@@ -98,6 +123,37 @@ python mikrotik_audit.py \
     --ssh-user admin \
     --output-dir ./reports
 ```
+
+---
+
+## 📸 Скриншоты
+
+### HTML отчёт
+
+![HTML Report Example](screenshots/html_report_example.png)
+
+*Пример HTML отчёта с проверками безопасности и сводкой конфигурации*
+
+### Markdown отчёт
+
+![Markdown Report Example](screenshots/markdown_report_example.png)
+
+*Markdown отчёт для форумов и документации*
+
+> 📝 **Примечание:** Скриншоты приведены для иллюстрации. Фактическое содержание отчёта зависит от конфигурации вашего роутера.
+
+## 🎯 Сценарии использования
+
+Этот инструмент незаменим в следующих ситуациях:
+
+| Сценарий | Зачем это нужно |
+|----------|----------------|
+| **Перед обновлением прошивки** | Задокументировать текущее состояние конфигурации и выявить потенциальные проблемы перед обновлением RouterOS |
+| **Передача роутера другому специалисту** | Создать подробную документацию для следующего администратора |
+| **Поиск проблем на форуме** | Поделиться обезличенными (redacted) отчётами при обращении за помощью на форумах MikroTik |
+| **Аудит безопасности** | Автоматически обнаружить ошибки конфигурации, слабые пароли и уязвимости |
+| **Документирование для compliance** | Вести аудит для соответствия требованиям безопасности |
+| **Проверка перед вводом в эксплуатацию** | Верифицировать конфигурацию роутера перед запуском в продакшен |
 
 ---
 
@@ -201,16 +257,26 @@ Mikrotik_audit/
 
 ## 🎯 Параметры командной строки
 
-| Параметр | Описание | По умолчанию |
-|----------|----------|--------------|
-| `--router-ip` | IP адрес или hostname роутера | 192.168.1.1 |
-| `--ssh-port` | SSH порт | 22 |
-| `--ssh-user` | SSH пользователь | admin |
-| `--ssh-pass` | SSH пароль (или через MIKROTIK_PASSWORD) | - |
-| `--audit-level` | Уровень аудита: Basic, Standard, Comprehensive | Standard |
-| `--output-dir` | Директория для отчетов | Mikrotik_audit-{timestamp} |
-| `--skip-security` | Пропустить анализ безопасности | False |
-| `--max-workers` | Максимум параллельных потоков | 5 |
+| Параметр | Описание | Обязателен | По умолчанию |
+|----------|----------|------------|--------------|
+| `--router-ip` | IP адрес или hostname роутера | Да | Авто-определение |
+| `--ssh-port` | SSH порт | Нет | 22 |
+| `--ssh-user` | SSH пользователь | Да | - |
+| `--ssh-pass` | SSH пароль | Да* | - |
+| `--ssh-key-file` | Путь к файлу приватного SSH ключа | Нет* | - |
+| `--ssh-key-passphrase` | Парольная фраза для SSH ключа | Нет | - |
+| `--audit-level` | Уровень аудита: Basic, Standard, Comprehensive | Нет | Standard |
+| `--output-dir` | Директория для отчетов | Нет | ./audit-reports |
+| `--skip-security` | Пропустить анализ безопасности | Нет | False |
+| `--max-workers` | Максимум параллельных потоков | Нет | 5 |
+| `--redact` | Скрыть чувствительные данные в отчётах | Нет | False |
+
+\* Необходимо указать либо `--ssh-pass`, либо `--ssh-key-file`.
+
+**Переменные окружения:**
+- `MIKROTIK_PASSWORD` - SSH пароль
+- `MIKROTIK_SSH_KEY_FILE` - Путь к SSH ключу
+- `MIKROTIK_SSH_KEY_PASSPHRASE` - Парольная фраза SSH ключа
 
 ---
 
@@ -316,6 +382,10 @@ SSHConnectionError: Could not get connection from pool
 ## 📄 Лицензия
 
 Этот проект распространяется под лицензией MIT - см. файл [LICENSE](LICENSE) для деталей.
+
+## 📝 Журнал изменений
+
+См. [CHANGELOG.md](../CHANGELOG.md) для получения информации о версиях и изменениях.
 
 ---
 
