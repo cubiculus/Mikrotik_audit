@@ -17,6 +17,20 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 
 ## 🚀 Quick Start
 
+### ⚡ One-Line Install
+
+**Windows:**
+```powershell
+scripts\install.bat
+```
+
+**Linux/Mac:**
+```bash
+bash scripts/install.sh
+```
+
+### 📋 Manual Install
+
 ```bash
 # Clone repository
 git clone https://github.com/cubiculus/Mikrotik_audit.git
@@ -39,6 +53,18 @@ python -m src.cli --ssh-user admin --ssh-key-file ~/.ssh/id_rsa
 
 # Run audit with redaction (hide sensitive data)
 python -m src.cli --ssh-user admin --ssh-pass your_password --redact
+```
+
+### 🎯 Quick Run
+
+**Windows:**
+```powershell
+scripts\run_audit.bat --ssh-user admin --ssh-pass your_password
+```
+
+**Linux/Mac:**
+```bash
+./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
 ```
 
 ## 📸 Screenshots
