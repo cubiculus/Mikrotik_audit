@@ -2,6 +2,7 @@
 
 import logging
 import re
+import shlex
 from typing import List, Tuple
 from functools import lru_cache
 
@@ -147,9 +148,17 @@ def parse_dhcp_leases(results: List) -> Tuple[List[DHCPLease], NetworkOverview]:
 
 @lru_cache(maxsize=256)
 def _parse_lease_data_cached(entry_str: str) -> dict:
-    """Кэшированная версия парсинга данных аренды."""
+    """Кэшированная версия парсинга данных аренды с поддержкой кавычек."""
     lease_data = {}
-    for part in entry_str.split():
+    
+    # Используем shlex.split для корректной обработки значений в кавычках
+    try:
+        parts = shlex.split(entry_str)
+    except ValueError:
+        # Если shlex не справился (например, незакрытые кавычки), используем обычный split
+        parts = entry_str.split()
+    
+    for part in parts:
         if '=' in part:
             try:
                 key, value = part.split('=', 1)

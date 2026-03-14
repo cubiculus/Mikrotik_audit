@@ -520,6 +520,37 @@
             {{ security_section | safe }}
         </div>
 
+        <!-- New sections -->
+        <div class="section">
+            <h2>💻 System Information</h2>
+            {{ system_info_section | safe }}
+        </div>
+
+        <div class="section">
+            <h2>🔌 Network Services</h2>
+            {{ services_section | safe }}
+        </div>
+
+        <div class="section">
+            <h2>📜 Certificates</h2>
+            {{ certificates_section | safe }}
+        </div>
+
+        <div class="section">
+            <h2>📝 Scripts & Scheduled Tasks</h2>
+            {{ scripts_section | safe }}
+        </div>
+
+        <div class="section">
+            <h2>🌐 Network Topology</h2>
+            {{ topology_section | safe }}
+        </div>
+
+        <div class="section">
+            <h2>🔍 Diagnostics</h2>
+            {{ diagnostics_section | safe }}
+        </div>
+
         <div class="section">
             <h2>Command Execution Results</h2>
             {{ failed_commands_section | safe }}

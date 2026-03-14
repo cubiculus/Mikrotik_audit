@@ -21,6 +21,24 @@ from src.parsers import (
     parse_routes,
     parse_routing_rules,
     parse_dns_config,
+    parse_system_resource,
+    parse_system_health,
+    parse_system_package,
+    parse_system_package_update,
+    parse_ip_service,
+    parse_ssh_sessions,
+    parse_users,
+    parse_certificates,
+    parse_scripts,
+    parse_scheduler,
+    parse_bridge_ports,
+    parse_wireguard_peers,
+    parse_ppp_active,
+    parse_arp,
+    parse_logs,
+    parse_firewall_logs,
+    parse_history,
+    parse_ping_results,
 )
 
 logger = logging.getLogger(__name__)
@@ -284,7 +302,97 @@ class DataParser:
             else:
                 overview.filter_rules = parse_filter_rules(results)
                 self._save_to_cache(cache_key, [r.__dict__ for r in overview.filter_rules], persist=True)
-        
+
+        # Parse system resources
+        resource_results = [r for r in results if r.command == '/system resource print']
+        if resource_results:
+            overview.system_resource = parse_system_resource(resource_results)
+
+        # Parse system health
+        health_results = [r for r in results if r.command == '/system health print']
+        if health_results:
+            overview.system_health = parse_system_health(health_results)
+
+        # Parse packages
+        package_results = [r for r in results if r.command == '/system package print']
+        if package_results:
+            overview.packages = parse_system_package(package_results)
+
+        # Parse package update
+        update_results = [r for r in results if r.command == '/system package update print']
+        if update_results:
+            overview.package_update = parse_system_package_update(update_results)
+
+        # Parse services
+        service_results = [r for r in results if r.command.startswith('/ip service')]
+        if service_results:
+            overview.services = parse_ip_service(service_results)
+
+        # Parse SSH sessions
+        ssh_results = [r for r in results if r.command.startswith('/ip ssh')]
+        if ssh_results:
+            overview.ssh_sessions = parse_ssh_sessions(ssh_results)
+
+        # Parse users
+        user_results = [r for r in results if r.command.startswith('/user')]
+        if user_results:
+            overview.users = parse_users(user_results)
+
+        # Parse certificates
+        cert_results = [r for r in results if r.command.startswith('/system certificate')]
+        if cert_results:
+            overview.certificates = parse_certificates(cert_results)
+
+        # Parse scripts
+        script_results = [r for r in results if r.command.startswith('/system script')]
+        if script_results:
+            overview.scripts = parse_scripts(script_results)
+
+        # Parse schedulers
+        scheduler_results = [r for r in results if r.command.startswith('/system scheduler')]
+        if scheduler_results:
+            overview.schedulers = parse_scheduler(scheduler_results)
+
+        # Parse bridge ports
+        bridge_results = [r for r in results if r.command.startswith('/interface bridge port')]
+        if bridge_results:
+            overview.bridge_ports = parse_bridge_ports(bridge_results)
+
+        # Parse WireGuard peers
+        wg_results = [r for r in results if r.command.startswith('/interface wireguard peers')]
+        if wg_results:
+            overview.wireguard_peers = parse_wireguard_peers(wg_results)
+
+        # Parse PPP active
+        ppp_results = [r for r in results if r.command.startswith('/ppp active')]
+        if ppp_results:
+            overview.ppp_active = parse_ppp_active(ppp_results)
+
+        # Parse ARP
+        arp_results = [r for r in results if r.command.startswith('/ip arp')]
+        if arp_results:
+            overview.arp_entries = parse_arp(arp_results)
+
+        # Parse logs
+        log_results = [r for r in results if r.command.startswith('/log print') and 'firewall' not in r.command]
+        if log_results:
+            overview.logs = parse_logs(log_results, count=50)
+
+        # Parse firewall logs
+        fw_log_results = [r for r in results if 'firewall' in r.command and r.command.startswith('/log')]
+        if fw_log_results:
+            overview.firewall_logs = parse_firewall_logs(fw_log_results)
+
+        # Parse history
+        history_results = [r for r in results if r.command.startswith('/system history')]
+        if history_results:
+            overview.history = parse_history(history_results)
+
+        # Parse ping results
+        ping_results_list = [r for r in results if r.command.startswith('/ping')]
+        if ping_results_list:
+            overview.ping_results = parse_ping_results(ping_results_list)
+
         return overview
     
     @staticmethod

@@ -71,6 +71,13 @@ class HTMLReportGenerator(BaseReportGenerator):
             nat_rules_section = self._create_nat_rules_section(network_overview)
             filter_rules_section = self._create_filter_rules_section(network_overview)
             backup_section = self._create_backup_section(backup_result)
+            # New sections
+            system_info_section = self._create_system_info_section(network_overview)
+            services_section = self._create_services_section(network_overview)
+            certificates_section = self._create_certificates_section(network_overview)
+            scripts_section = self._create_scripts_section(network_overview)
+            topology_section = self._create_topology_section(network_overview)
+            diagnostics_section = self._create_diagnostics_section(network_overview)
 
             # Render template с autoescape
             report_datetime = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
@@ -98,6 +105,13 @@ class HTMLReportGenerator(BaseReportGenerator):
                 failed_commands_section=failed_commands_section,
                 nat_rules_section=nat_rules_section,
                 filter_rules_section=filter_rules_section,
+                # New sections
+                system_info_section=system_info_section,
+                services_section=services_section,
+                certificates_section=certificates_section,
+                scripts_section=scripts_section,
+                topology_section=topology_section,
+                diagnostics_section=diagnostics_section,
             )
 
             # Write report
@@ -732,3 +746,434 @@ class HTMLReportGenerator(BaseReportGenerator):
         except Exception as e:
             logger.error(f"Error creating filter rules section: {e}")
             return f'<p style="color: #d11;">Error creating filter rules section: {e}</p>'
+
+    def _create_system_info_section(self, overview) -> str:
+        """Create system information section."""
+        try:
+            if not overview.system_resource:
+                return '<p>No system resource data available</p>'
+            
+            res = overview.system_resource
+            html_parts = ['<div class="info-grid">']
+            
+            # CPU and Memory
+            cpu_load_str = ', '.join(f'{x}%' for x in res.cpu_load) if res.cpu_load else 'N/A'
+            mem_percent = (res.total_memory - res.free_memory) / res.total_memory * 100 if res.total_memory > 0 else 0
+            
+            html_parts.append(f'''
+                <div class="info-item">
+                    <span class="info-label">CPU Load:</span>
+                    <span class="info-value">{cpu_load_str}</span>
+                </div>
+            ''')
+            
+            html_parts.append(f'''
+                <div class="info-item">
+                    <span class="info-label">Memory:</span>
+                    <span class="info-value">{res.free_memory // (1024*1024)}MB / {res.total_memory // (1024*1024)}MB ({mem_percent:.1f}% used)</span>
+                </div>
+            ''')
+            
+            html_parts.append(f'''
+                <div class="info-item">
+                    <span class="info-label">HDD:</span>
+                    <span class="info-value">{res.free_hdd // (1024*1024)}MB / {res.total_hdd // (1024*1024)}MB</span>
+                </div>
+            ''')
+            
+            html_parts.append(f'''
+                <div class="info-item">
+                    <span class="info-label">Uptime:</span>
+                    <span class="info-value">{res.uptime or 'N/A'}</span>
+                </div>
+            ''')
+            
+            html_parts.append(f'''
+                <div class="info-item">
+                    <span class="info-label">Version:</span>
+                    <span class="info-value">{res.version or 'N/A'}</span>
+                </div>
+            ''')
+            
+            html_parts.append(f'''
+                <div class="info-item">
+                    <span class="info-label">Board:</span>
+                    <span class="info-value">{res.board_name or 'N/A'}</span>
+                </div>
+            ''')
+            
+            # Health info
+            if overview.system_health:
+                health = overview.system_health
+                if health.temperature:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">Temperature:</span>
+                            <span class="info-value">{health.temperature}</span>
+                        </div>
+                    ''')
+                if health.voltage:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">Voltage:</span>
+                            <span class="info-value">{health.voltage}</span>
+                        </div>
+                    ''')
+            
+            # Update info
+            if overview.package_update:
+                update = overview.package_update
+                if update.get('update_available'):
+                    html_parts.append(f'''
+                        <div class="info-item" style="border-left: 4px solid #f59e0b;">
+                            <span class="info-label">Update Available:</span>
+                            <span class="info-value" style="color: #f59e0b;">{update.get('installed_version', '')} → {update.get('latest_version', '')}</span>
+                        </div>
+                    ''')
+            
+            html_parts.append('</div>')
+            return ''.join(html_parts)
+            
+        except Exception as e:
+            logger.error(f"Error creating system info section: {e}")
+            return f'<p style="color: #d11;">Error creating system info section: {e}</p>'
+
+    def _create_services_section(self, overview) -> str:
+        """Create services section."""
+        try:
+            if not overview.services:
+                return '<p>No service data available</p>'
+            
+            rows = []
+            for svc in overview.services:
+                status_class = 'status-error' if svc.disabled else 'status-success'
+                status_text = 'Disabled' if svc.disabled else 'Enabled'
+                rows.append(f'''
+                    <tr>
+                        <td>{svc.name}</td>
+                        <td>{svc.port}</td>
+                        <td><span class="{status_class}">{status_text}</span></td>
+                        <td>{'Yes' if svc.tls_required else 'No'}</td>
+                        <td>{svc.address or 'Any'}</td>
+                        <td>{svc.comment or '-'}</td>
+                    </tr>
+                ''')
+            
+            return f'''
+                <div style="overflow-x: auto;">
+                    <table class="commands-table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Port</th>
+                                <th>Status</th>
+                                <th>TLS Required</th>
+                                <th>Address Filter</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(rows)}</tbody>
+                    </table>
+                </div>
+            '''
+        except Exception as e:
+            logger.error(f"Error creating services section: {e}")
+            return f'<p style="color: #d11;">Error creating services section: {e}</p>'
+
+    def _create_certificates_section(self, overview) -> str:
+        """Create certificates section."""
+        try:
+            if not overview.certificates:
+                return '<p>No certificate data available</p>'
+            
+            rows = []
+            for cert in overview.certificates:
+                expired_class = 'style="background: #fef2f2;"' if cert.expired else ''
+                expired_text = 'EXPIRED' if cert.expired else 'Valid'
+                rows.append(f'''
+                    <tr {expired_class}>
+                        <td>{cert.name}</td>
+                        <td>{cert.common_name}</td>
+                        <td>{cert.valid_from}</td>
+                        <td>{cert.valid_until}</td>
+                        <td>{expired_text}</td>
+                        <td>{cert.key_type} {cert.key_size}-bit</td>
+                    </tr>
+                ''')
+            
+            return f'''
+                <div style="overflow-x: auto;">
+                    <table class="commands-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Common Name</th>
+                                <th>Valid From</th>
+                                <th>Valid Until</th>
+                                <th>Status</th>
+                                <th>Key</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(rows)}</tbody>
+                    </table>
+                </div>
+            '''
+        except Exception as e:
+            logger.error(f"Error creating certificates section: {e}")
+            return f'<p style="color: #d11;">Error creating certificates section: {e}</p>'
+
+    def _create_scripts_section(self, overview) -> str:
+        """Create scripts and scheduler section."""
+        try:
+            html_parts = []
+            
+            # Scripts
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Scripts</h3>')
+            if overview.scripts:
+                rows = []
+                for script in overview.scripts:
+                    rows.append(f'''
+                        <tr>
+                            <td>{script.name}</td>
+                            <td>{script.owner}</td>
+                            <td>{', '.join(script.policy)}</td>
+                            <td>{script.last_modified or '-'}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Owner</th>
+                                    <th>Policy</th>
+                                    <th>Last Modified</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+            else:
+                html_parts.append('<p>No scripts found</p>')
+            
+            # Schedulers
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Scheduled Tasks</h3>')
+            if overview.schedulers:
+                rows = []
+                for sched in overview.schedulers:
+                    disabled_style = 'color: #999;' if sched.disabled else ''
+                    rows.append(f'''
+                        <tr style="{disabled_style}">
+                            <td>{sched.name}</td>
+                            <td>{sched.on_event or sched.script}</td>
+                            <td>{sched.interval or 'Once'}</td>
+                            <td>{sched.next_run or 'N/A'}</td>
+                            <td>{'Disabled' if sched.disabled else 'Active'}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Script</th>
+                                    <th>Interval</th>
+                                    <th>Next Run</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+            else:
+                html_parts.append('<p>No scheduled tasks found</p>')
+            
+            return ''.join(html_parts)
+        except Exception as e:
+            logger.error(f"Error creating scripts section: {e}")
+            return f'<p style="color: #d11;">Error creating scripts section: {e}</p>'
+
+    def _create_topology_section(self, overview) -> str:
+        """Create network topology section (Bridge, WireGuard, PPP, ARP)."""
+        try:
+            html_parts = []
+            
+            # Bridge Ports
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Bridge Ports</h3>')
+            if overview.bridge_ports:
+                rows = []
+                for port in overview.bridge_ports:
+                    rows.append(f'''
+                        <tr>
+                            <td>{port.bridge}</td>
+                            <td>{port.port}</td>
+                            <td>{port.path_cost}</td>
+                            <td>{'Yes' if port.hw else 'No'}</td>
+                            <td>{'Disabled' if port.disabled else 'Active'}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Bridge</th>
+                                    <th>Port</th>
+                                    <th>Path Cost</th>
+                                    <th>HW Offload</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+            else:
+                html_parts.append('<p>No bridge ports found</p>')
+            
+            # WireGuard Peers
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">WireGuard Peers</h3>')
+            if overview.wireguard_peers:
+                rows = []
+                for peer in overview.wireguard_peers:
+                    rows.append(f'''
+                        <tr>
+                            <td>{peer.interface}</td>
+                            <td>{peer.public_key[:16]}...</td>
+                            <td>{peer.endpoint_address}:{peer.endpoint_port or 'N/A'}</td>
+                            <td>{peer.last_handshake or 'Never'}</td>
+                            <td>RX: {peer.rx_bytes:,} / TX: {peer.tx_bytes:,}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Interface</th>
+                                    <th>Public Key</th>
+                                    <th>Endpoint</th>
+                                    <th>Last Handshake</th>
+                                    <th>Traffic</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+            else:
+                html_parts.append('<p>No WireGuard peers found</p>')
+            
+            # PPP Active
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Active VPN Connections</h3>')
+            if overview.ppp_active:
+                rows = []
+                for conn in overview.ppp_active:
+                    rows.append(f'''
+                        <tr>
+                            <td>{conn.user}</td>
+                            <td>{conn.address}</td>
+                            <td>{conn.service}</td>
+                            <td>{conn.caller_id}</td>
+                            <td>{conn.uptime}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Address</th>
+                                    <th>Service</th>
+                                    <th>Caller ID</th>
+                                    <th>Uptime</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+            else:
+                html_parts.append('<p>No active VPN connections</p>')
+            
+            return ''.join(html_parts)
+        except Exception as e:
+            logger.error(f"Error creating topology section: {e}")
+            return f'<p style="color: #d11;">Error creating topology section: {e}</p>'
+
+    def _create_diagnostics_section(self, overview) -> str:
+        """Create diagnostics section (logs, history)."""
+        try:
+            html_parts = []
+            
+            # Recent Logs
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Recent Logs (last 50)</h3>')
+            if overview.logs:
+                rows = []
+                for log in overview.logs[:20]:  # Show only first 20
+                    rows.append(f'''
+                        <tr>
+                            <td>{log.time}</td>
+                            <td>{log.topics}</td>
+                            <td style="max-width: 400px; word-break: break-word;">{log.message}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Topics</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+                if len(overview.logs) > 20:
+                    html_parts.append(f'<p style="color: #666; font-style: italic;">... and {len(overview.logs) - 20} more entries</p>')
+            else:
+                html_parts.append('<p>No log entries found</p>')
+            
+            # Configuration History
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Configuration History</h3>')
+            if overview.history:
+                rows = []
+                for hist in overview.history[:20]:  # Show only first 20
+                    rows.append(f'''
+                        <tr>
+                            <td>{hist.time}</td>
+                            <td>{hist.by}</td>
+                            <td>{hist.action}</td>
+                            <td style="max-width: 300px; word-break: break-word; font-family: monospace; font-size: 0.85em;">{hist.cmd}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>By</th>
+                                    <th>Action</th>
+                                    <th>Command</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                ''')
+            else:
+                html_parts.append('<p>No history entries found</p>')
+            
+            return ''.join(html_parts)
+        except Exception as e:
+            logger.error(f"Error creating diagnostics section: {e}")
+            return f'<p style="color: #d11;">Error creating diagnostics section: {e}</p>'

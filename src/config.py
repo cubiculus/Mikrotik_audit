@@ -105,6 +105,12 @@ def redact_sensitive_data(text: str) -> str:
     - PPP secrets passwords
     - Hotspot user passwords
     - Public IP addresses (partially)
+    - MAC addresses
+    - User login names
+    - Host names from DHCP
+    - Client IDs
+    - Last logged-in timestamps
+    - Time zone city names
 
     Internal IP addresses (192.168.x.x, 10.x.x.x, 172.16-31.x.x) are NOT masked
     as they are not considered sensitive for audit purposes.
@@ -131,6 +137,29 @@ def redact_sensitive_data(text: str) -> str:
     result = re.sub(r'password[\s\-_:]*:[\s\-_:]*\S+', 'password: [REDACTED]', result, flags=re.IGNORECASE)
     result = re.sub(r'pwd[\s\-_:]*=[\s\-_:]*[^=\s]+', 'pwd=[REDACTED]', result, flags=re.IGNORECASE)
     result = re.sub(r'pwd[\s\-_:]*:[\s\-_:]*\S+', 'pwd: [REDACTED]', result, flags=re.IGNORECASE)
+
+    # Mask MAC addresses (globally unique device identifiers)
+    result = re.sub(r'\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b', '[MAC REDACTED]', result)
+
+    # Mask user login names from /user print
+    result = re.sub(r'name="([^"]+)"(?=.*group=)', r'name="[USER REDACTED]"', result)
+    result = re.sub(r'name=([^\s,]+)(?=.*group=)', r'name=[USER REDACTED]', result)
+
+    # Mask host names from DHCP leases
+    result = re.sub(r'host-name="([^"]+)"', r'host-name="[HOST REDACTED]"', result)
+    result = re.sub(r'host-name=([^\s,]+)', r'host-name=[HOST REDACTED]', result)
+
+    # Mask client IDs (hardware fingerprints)
+    result = re.sub(r'client-id="([^"]+)"', r'client-id="[ID REDACTED]"', result)
+    result = re.sub(r'client-id=([^\s,]+)', r'client-id=[ID REDACTED]', result)
+
+    # Mask last logged-in timestamps (activity patterns)
+    result = re.sub(r'last-logged-in=\S+', r'last-logged-in=[REDACTED]', result)
+
+    # Mask time zone city (keep region only)
+    # Europe/Moscow -> Europe/[REDACTED]
+    result = re.sub(r'(time-zone[-_]?name:\s*\w+)/(\w+)', r'\1/[REDACTED]', result)
+    result = re.sub(r'(time-zone[-_]?name=)(\w+)/(\w+)', r'\1\2/[REDACTED]', result)
 
     # Mask ONLY public IP addresses (not private ranges)
     # Private IP ranges to exclude:
