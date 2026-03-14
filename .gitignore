@@ -266,6 +266,7 @@ site/
 !LICENSE
 !scripts/*
 !.*.gitignore
+!.pre-commit-config.yaml
 
 # Временные файлы с числами
 *.[0-9]*
