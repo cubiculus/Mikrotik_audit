@@ -298,6 +298,49 @@
             white-space: nowrap;
         }
 
+        .rules-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+            background: white;
+        }
+
+        .rules-table thead {
+            background: #f3f4f6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .rules-table th {
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+        }
+
+        .rules-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: middle;
+        }
+
+        .rules-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .rules-table tr.disabled-rule {
+            background: #fef2f2;
+            opacity: 0.7;
+        }
+
+        .rules-table tr.disabled-rule:hover {
+            background: #fee2e2;
+        }
+        }
+
         .action-badge {
             display: inline-block;
             padding: 3px 8px;
