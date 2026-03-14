@@ -116,7 +116,7 @@ def parse_dhcp_leases(results: List) -> Tuple[List[DHCPLease], NetworkOverview]:
             # Парсим данные из строки
             lease_data = _parse_lease_data(full_entry)
 
-            # Создаем объект аренды
+            # Create lease object
             lease = DHCPLease()
             lease.address = lease_data.get('address', '')
             lease.mac_address = lease_data.get('mac_address', '')
@@ -127,8 +127,7 @@ def parse_dhcp_leases(results: List) -> Tuple[List[DHCPLease], NetworkOverview]:
             lease.last_seen = lease_data.get('last_seen', '')
             lease.server = lease_data.get('server', '')
             lease.comment = comment
-            lease.dynamic_entry = is_dynamic
-            lease.dynamic = is_dynamic
+            lease.dynamic = is_dynamic  # Single boolean field
             lease.lease_status = "Dynamic" if is_dynamic else "Static"
 
             # Добавляем запись если есть данные

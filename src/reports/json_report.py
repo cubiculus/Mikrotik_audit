@@ -105,7 +105,7 @@ class JSONReportGenerator(BaseReportGenerator):
                             "mac_address": getattr(l, 'mac_address', ''),
                             "host_name": getattr(l, 'host_name', '') or getattr(l, 'client_hostname', ''),
                             "address_lists": getattr(l, 'address_lists', ''),
-                            "dynamic": getattr(l, 'dynamic', getattr(l, 'dynamic_entry', False)),
+                            "dynamic": getattr(l, 'dynamic', False),
                             "comment": getattr(l, 'comment', ''),
                         }
                         for l in network_overview.dhcp_leases

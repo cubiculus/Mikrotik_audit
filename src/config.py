@@ -100,30 +100,93 @@ class BackupResult(BaseModel):
 
 def redact_sensitive_data(text: str) -> str:
     """
-    Маскирует чувствительные данные в тексте:
-    - Серийные номера
-    - Пароли PPP-секретов
-    - Пароли Hotspot пользователей
-    - IP-адреса (частично)
+    Mask sensitive data in text:
+    - Serial numbers
+    - PPP secrets passwords
+    - Hotspot user passwords
+    - Public IP addresses (partially)
+
+    Internal IP addresses (192.168.x.x, 10.x.x.x, 172.16-31.x.x) are NOT masked
+    as they are not considered sensitive for audit purposes.
     """
     import re
-    
+
     if not text:
         return text
-    
+
     result = text
-    
-    # Маскирование серийных номеров (формат MikroTik: 8 символов буквы/цифры)
+
+    # Mask serial numbers (MikroTik format: 8 alphanumeric chars)
     result = re.sub(r'(?i)(serial[-_]?number|serial):\s*([A-Z0-9]{8})', r'\1: [REDACTED]', result)
-    
-    # Маскирование паролей PPP secrets
-    result = re.sub(r'(?i)(password|secret)[-_]?ppp[^:]*:\s*(\S+)', r'\1: [REDACTED]', result)
-    result = re.sub(r'(?i)ppp\s+secret.*?(password|secret)=(\S+)', r'[PP SECRET REDACTED]', result, flags=re.IGNORECASE)
-    
-    # Маскирование паролей Hotspot пользователей
-    result = re.sub(r'(?i)(hotspot\s+user).*?(password|pwd)=(\S+)', r'\1 [PASSWORD REDACTED]', result, flags=re.IGNORECASE)
-    
-    # Маскирование IP-адресов (последний октет)
-    result = re.sub(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.)\d{1,3}\b', r'\1***', result)
-    
+
+    # Mask PPP secrets passwords
+    result = re.sub(r'(?i)(password|secret)[-_]?ppp[^:]*:\s*\S+', r'\1: [REDACTED]', result)
+    result = re.sub(r'(?i)ppp[\s\-_]+secret[\s\-_]*=[\s\-_]*\S+', r'[PP SECRET REDACTED]', result, flags=re.IGNORECASE)
+
+    # Mask Hotspot user passwords
+    result = re.sub(r'(?i)hotspot[\s\-_]+user[\s\-_]*=[\s\-_]*\S+', r'[PASSWORD REDACTED]', result, flags=re.IGNORECASE)
+
+    # Mask password fields (all variations)
+    result = re.sub(r'password[\s\-_:]*=[\s\-_:]*[^=\s]+', 'password=[REDACTED]', result, flags=re.IGNORECASE)
+    result = re.sub(r'password[\s\-_:]*:[\s\-_:]*\S+', 'password: [REDACTED]', result, flags=re.IGNORECASE)
+    result = re.sub(r'pwd[\s\-_:]*=[\s\-_:]*[^=\s]+', 'pwd=[REDACTED]', result, flags=re.IGNORECASE)
+    result = re.sub(r'pwd[\s\-_:]*:[\s\-_:]*\S+', 'pwd: [REDACTED]', result, flags=re.IGNORECASE)
+
+    # Mask ONLY public IP addresses (not private ranges)
+    # Private IP ranges to exclude:
+    # - 10.0.0.0/8
+    # - 172.16.0.0/12 (172.16.0.0 to 172.31.255.255)
+    # - 192.168.0.0/16
+    # - 127.0.0.0/8 (loopback)
+    # - 169.254.0.0/16 (link-local)
+    # - 224.0.0.0/4 (multicast)
+
+    def _is_private_ip(match):
+        """Check if matched IP is in private range."""
+        ip = match.group(0)
+        try:
+            octets = [int(x) for x in ip.split('.')]
+            if len(octets) != 4:
+                return False
+
+            first, second, third, fourth = octets
+
+            # 10.0.0.0/8
+            if first == 10:
+                return True
+
+            # 172.16.0.0/12
+            if first == 172 and 16 <= second <= 31:
+                return True
+
+            # 192.168.0.0/16
+            if first == 192 and second == 168:
+                return True
+
+            # 127.0.0.0/8 (loopback)
+            if first == 127:
+                return True
+
+            # 169.254.0.0/16 (link-local)
+            if first == 169 and second == 254:
+                return True
+
+            # 224.0.0.0/4 (multicast)
+            if first >= 224:
+                return True
+
+            return False
+        except (ValueError, IndexError):
+            return False
+
+    # Match IP addresses and filter out private ones
+    def _mask_public_ip(match):
+        """Mask the IP if it's public, keep it if private."""
+        if _is_private_ip(match):
+            return match.group(0)  # Keep private IPs unchanged
+        # Mask public IPs (replace last octet)
+        return match.group(1) + '***'
+
+    result = re.sub(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.)\d{1,3}\b', _mask_public_ip, result)
+
     return result

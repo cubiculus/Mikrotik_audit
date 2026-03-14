@@ -6,6 +6,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Any, Dict, Optional
+from collections import OrderedDict
 
 from src.config import CommandResult, RouterInfo, SecurityIssue
 from src.models import NetworkOverview
@@ -32,20 +33,19 @@ class DataParser:
         """Initialize parser with optional cache directory."""
         self.cache_dir = cache_dir or Path(".cache")
         self.cache_dir.mkdir(exist_ok=True)
-        self._memory_cache: dict[str, Any] = {}
-        self._cache_access_order: list[str] = []  # Для LRU eviction
+        # Use OrderedDict for O(1) LRU operations
+        self._memory_cache: OrderedDict[str, Any] = OrderedDict()
+        self._max_cache_size = 100
 
     def _get_cache_key(self, command_output: str) -> str:
         """Generate cache key based on content using SHA256."""
         return hashlib.sha256(command_output.encode()).hexdigest()
 
     def _get_from_cache(self, cache_key: str):
-        """Retrieve data from cache."""
+        """Retrieve data from cache with O(1) operations."""
         if cache_key in self._memory_cache:
-            # Update access order for LRU
-            if cache_key in self._cache_access_order:
-                self._cache_access_order.remove(cache_key)
-            self._cache_access_order.append(cache_key)
+            # Move to end to mark as recently used (O(1) with OrderedDict)
+            self._memory_cache.move_to_end(cache_key)
             logger.debug(f"Cache hit (memory): {cache_key[:8]}")
             return self._memory_cache[cache_key]
 
@@ -57,23 +57,17 @@ class DataParser:
         return None
 
     def _save_to_cache(self, cache_key: str, data, persist: bool = False):
-        """Save data to cache with LRU eviction policy."""
-        # Memory cache with LRU eviction
-        max_cache_size = 100
-        if cache_key not in self._memory_cache and len(self._memory_cache) >= max_cache_size:
-            # Evict least recently used item
-            if self._cache_access_order:
-                lru_key = self._cache_access_order.pop(0)
-                if lru_key in self._memory_cache:
-                    del self._memory_cache[lru_key]
-                    logger.debug(f"Evicted LRU cache entry: {lru_key[:8]}")
-        
-        # Update access order
-        if cache_key in self._cache_access_order:
-            self._cache_access_order.remove(cache_key)
-        self._cache_access_order.append(cache_key)
-        
+        """Save data to cache with O(1) LRU eviction."""
+        # Memory cache with LRU eviction using OrderedDict
+        if cache_key not in self._memory_cache and len(self._memory_cache) >= self._max_cache_size:
+            # Evict least recently used item (first item in OrderedDict)
+            lru_key = next(iter(self._memory_cache))
+            del self._memory_cache[lru_key]
+            logger.debug(f"Evicted LRU cache entry: {lru_key[:8]}")
+
+        # Update access order - move to end if exists, or add to end
         self._memory_cache[cache_key] = data
+        self._memory_cache.move_to_end(cache_key)
 
         # Disk cache if persist is True
         if persist:
@@ -154,7 +148,8 @@ class DataParser:
             cache_key = self._get_cache_key(f"ip_addresses:{ip_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.ip_addresses = cached['ip_addresses']
+                from src.models import IPAddress
+                overview.ip_addresses = [IPAddress(**ip) for ip in cached['ip_addresses']]
                 overview.total_ip_addresses = cached['total_ip_addresses']
                 logger.debug("Using cached IP address data")
             else:
@@ -162,7 +157,7 @@ class DataParser:
                 overview.ip_addresses = ip_addresses
                 overview.total_ip_addresses = ip_overview.total_ip_addresses
                 self._save_to_cache(cache_key, {
-                    'ip_addresses': ip_addresses,
+                    'ip_addresses': [ip.__dict__ for ip in ip_addresses],
                     'total_ip_addresses': ip_overview.total_ip_addresses
                 }, persist=True)
 
@@ -173,20 +168,18 @@ class DataParser:
             cache_key = self._get_cache_key(f"dhcp_leases:{dhcp_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.dhcp_leases = cached['dhcp_leases']
+                from src.models import DHCPLease
+                overview.dhcp_leases = [DHCPLease(**lease) for lease in cached['dhcp_leases']]
                 overview.dhcp_leases_count = cached['dhcp_leases_count']
                 overview.dhcp_active_leases = cached['dhcp_active_leases']
                 logger.debug("Using cached DHCP lease data")
             else:
                 dhcp_leases, dhcp_overview = parse_dhcp_leases(dhcp_results)
-                for lease in dhcp_leases:
-                    if not hasattr(lease, 'dynamic'):
-                        lease.dynamic = getattr(lease, 'dynamic_entry', False)
                 overview.dhcp_leases = dhcp_leases
                 overview.dhcp_leases_count = dhcp_overview.dhcp_leases_count
                 overview.dhcp_active_leases = dhcp_overview.dhcp_active_leases
                 self._save_to_cache(cache_key, {
-                    'dhcp_leases': dhcp_leases,
+                    'dhcp_leases': [lease.__dict__ for lease in dhcp_leases],
                     'dhcp_leases_count': dhcp_overview.dhcp_leases_count,
                     'dhcp_active_leases': dhcp_overview.dhcp_active_leases
                 }, persist=True)
@@ -198,7 +191,8 @@ class DataParser:
             cache_key = self._get_cache_key(f"containers:{container_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.containers = cached['containers']
+                from src.models import Container
+                overview.containers = [Container(**c) for c in cached['containers']]
                 overview.containers_total = cached['containers_total']
                 overview.containers_running = cached['containers_running']
                 logger.debug("Using cached container data")
@@ -208,7 +202,7 @@ class DataParser:
                 overview.containers_total = containers_overview.containers_total
                 overview.containers_running = containers_overview.containers_running
                 self._save_to_cache(cache_key, {
-                    'containers': containers,
+                    'containers': [c.__dict__ for c in containers],
                     'containers_total': containers_overview.containers_total,
                     'containers_running': containers_overview.containers_running
                 }, persist=True)

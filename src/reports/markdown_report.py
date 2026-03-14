@@ -239,7 +239,7 @@ class MarkdownReportGenerator(BaseReportGenerator):
             lines.append("| IP Address | MAC Address | Hostname | Type |")
             lines.append("|------------|-------------|----------|------|")
             for lease in overview.dhcp_leases[:30]:
-                lease_type = "Static" if not getattr(lease, 'dynamic', getattr(lease, 'dynamic_entry', False)) else "Dynamic"
+                lease_type = "Static" if not getattr(lease, 'dynamic', False) else "Dynamic"
                 hostname = getattr(lease, 'host_name', '') or getattr(lease, 'hostname', '') or getattr(lease, 'client_hostname', '') or '-'
                 lines.append(f"| {lease.address} | {lease.mac_address} | {hostname} | {lease_type} |")
             if len(overview.dhcp_leases) > 30:

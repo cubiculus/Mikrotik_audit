@@ -8,11 +8,15 @@ from typing import Optional
 
 import click
 from colorama import Fore, Style, init
+from dotenv import load_dotenv
 
 from src.config import RouterConfig, AuditConfig, AuditLevel
 from src.auditor import MikroTikAuditor
 from src.backup_manager import BackupManager
 from src.report_generator import ReportGenerator
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize colorama
 init(autoreset=True)
@@ -41,11 +45,6 @@ logger = logging.getLogger(__name__)
     '--ssh-user',
     default=None,
     help='SSH username'
-)
-@click.option(
-    '--ssh-pass',
-    default='',
-    help='SSH password (or set MIKROTIK_PASSWORD environment variable)'
 )
 @click.option(
     '--ssh-key-file',
@@ -90,7 +89,6 @@ def main(
     router_ip: Optional[str],
     ssh_port: Optional[int],
     ssh_user: Optional[str],
-    ssh_pass: str,
     ssh_key_file: Optional[str],
     ssh_key_passphrase: Optional[str],
     audit_level: str,
@@ -106,20 +104,24 @@ def main(
         router_ip = router_ip or os.getenv("MIKROTIK_IP", "192.168.1.1")
         ssh_port = ssh_port or int(os.getenv("MIKROTIK_PORT", "22"))
         ssh_user = ssh_user or os.getenv("MIKROTIK_USER", "admin")
-        ssh_pass = ssh_pass or os.getenv("MIKROTIK_PASSWORD", "")
         ssh_key_file = ssh_key_file or os.getenv("MIKROTIK_SSH_KEY_FILE")
         ssh_key_passphrase = ssh_key_passphrase or os.getenv("MIKROTIK_SSH_KEY_PASSPHRASE")
 
-        # Проверка: требуется либо пароль, либо SSH-ключ
+        # Get SSH password securely from environment or prompt
+        ssh_pass = os.getenv("MIKROTIK_PASSWORD")
+        if not ssh_pass and not ssh_key_file:
+            # Prompt for password securely if no SSH key provided
+            ssh_pass = click.prompt('SSH Password', hide_input=True)
+
+        # Validate that we have at least password or SSH key
         if not ssh_pass and not ssh_key_file:
             logger.error(
-                "SSH password not provided. "
-                "Set MIKROTIK_PASSWORD environment variable, use --ssh-pass option, "
-                "or provide SSH key with --ssh-key-file"
+                "Authentication failed: No password or SSH key provided. "
+                "Set MIKROTIK_PASSWORD environment variable or provide SSH key."
             )
             click.echo(
                 "Error: SSH password or SSH key is required. "
-                "Use --ssh-pass, --ssh-key-file, or set MIKROTIK_PASSWORD/MIKROTIK_SSH_KEY_FILE.",
+                "Set MIKROTIK_PASSWORD environment variable or use --ssh-key-file.",
                 err=True
             )
             sys.exit(1)
@@ -176,6 +178,9 @@ def main(
         backup_manager = BackupManager(auditor.ssh)
         backup_result = backup_manager.perform_backup(output_path)
 
+        # Continue with reports regardless of backup status
+        # Skipped backups (due to insufficient permissions) are not fatal
+
         # Generate reports
         logger.info(f"\n{Fore.YELLOW}📄 Generating reports...{Style.RESET_ALL}")
         generator = ReportGenerator(output_path)
@@ -190,6 +195,10 @@ def main(
 
         sys.exit(0)
 
+    except KeyboardInterrupt:
+        logger.info("\nAudit interrupted by user.")
+        click.echo("\nOperation cancelled by user.", err=True)
+        sys.exit(130)
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)

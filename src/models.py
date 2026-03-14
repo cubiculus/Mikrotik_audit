@@ -134,11 +134,12 @@ class DHCPLease:
     client_hostname: str = ""
     host_name: str = ""
     address_lists: str = ""
-    lease_status: str = ""  # Это будет "Static" или "Dynamic"
+    lease_status: str = ""  # Will be "Static" or "Dynamic"
     expires_after: str = ""
     last_seen: str = ""
     server: str = ""
-    dynamic_entry: bool = False
+    # Single boolean field for dynamic vs static
+    # True = dynamic lease, False = static lease
     dynamic: bool = False
     comment: str = ""
 

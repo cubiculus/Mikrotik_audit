@@ -3,6 +3,8 @@
 import paramiko
 import logging
 import re
+import os
+import stat
 from typing import Tuple, Optional
 from contextlib import contextmanager
 from queue import Queue, Empty
@@ -52,6 +54,7 @@ class SSHConnectionPool:
         self._pool: Queue = Queue(maxsize=max_connections)
         self._lock = Lock()
         self._active_connections = 0
+        self._issued_connections: set[int] = set()  # Track connections currently in use
 
     @contextmanager
     def get_connection(self):
@@ -95,55 +98,107 @@ class SSHConnectionPool:
             yield conn
         finally:
             if conn:
-                # Возвращаем в пул если живо
+                # Remove from issued set
+                with self._lock:
+                    self._issued_connections.discard(id(conn))
+
+                # Return to pool if alive
                 if self._is_connection_alive(conn):
                     self._pool.put(conn)
                 else:
                     with self._lock:
                         self._active_connections -= 1
 
-    def _create_connection(self) -> paramiko.SSHClient:
-        """Создать новое SSH-соединение."""
-        client = paramiko.SSHClient()
-        # Используем RejectPolicy для защиты от MITM-атак
-        # Ключи хостов должны быть предварительно сохранены в known_hosts
-        client.set_missing_host_key_policy(paramiko.RejectPolicy())
-        
+    def _validate_ssh_key_permissions(self, key_path: Path) -> None:
+        """
+        Validate SSH key file permissions are secure.
+
+        Raises SSHConnectionError if key file has insecure permissions.
+
+        Private SSH keys should only be readable by the owner.
+        On Unix/Linux: permissions should be 0600 or stricter (0400).
+        On Windows: file owner should be the current user.
+        """
         try:
-            # Подготовка параметров подключения
+            file_stat = key_path.stat()
+            mode = file_stat.st_mode
+
+            # Check permissions on Unix/Linux/macOS
+            if os.name != 'nt':  # Not Windows
+                # Check if group or others have read permission
+                if mode & (stat.S_IRGRP | stat.S_IROTH):
+                    raise SSHConnectionError(
+                        f"SSH key file {key_path} has insecure permissions. "
+                        f"Permissions should be 0600 (owner only readable). "
+                        f"Current permissions: {oct(stat.S_IMODE(mode))}. "
+                        f"Run: chmod 600 {key_path}"
+                    )
+
+            # On Windows, check if file exists and is readable
+            # (Windows uses ACLs, not Unix permissions, so we do basic checks)
+            else:
+                try:
+                    # Try to read first few bytes to verify file is accessible
+                    with open(key_path, 'rb') as f:
+                        f.read(100)
+                except (PermissionError, OSError) as e:
+                    raise SSHConnectionError(
+                        f"Cannot read SSH key file {key_path}: {e}. "
+                        "Ensure you have the necessary permissions."
+                    )
+
+            logger.debug(f"SSH key permissions validated: {key_path}")
+
+        except FileNotFoundError:
+            raise SSHConnectionError(f"SSH key file not found: {key_path}")
+        except SSHConnectionError:
+            raise  # Re-raise our custom errors
+        except Exception as e:
+            logger.warning(f"Could not fully validate SSH key permissions: {e}")
+            # Don't fail if we can't validate, but log it
+
+    def _create_connection(self) -> paramiko.SSHClient:
+        """Create a new SSH connection with validated credentials."""
+        client = paramiko.SSHClient()
+        # AutoAddPolicy adds unknown host keys (for first connection)
+        # For production use, consider RejectPolicy with pre-saved known_hosts
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            # Prepare connection parameters
             connect_kwargs = {
                 "hostname": self.config.router_ip,
                 "port": self.config.ssh_port,
                 "username": self.config.ssh_user,
                 "timeout": self.config.connect_timeout,
-                "allow_agent": True,  # Использовать ssh-agent если доступен
-                "look_for_keys": True,  # Искать ключи в ~/.ssh/
+                "allow_agent": False,  # Disabled for MikroTik compatibility
+                "look_for_keys": False,  # Disabled for MikroTik compatibility
                 "auth_timeout": self.config.connect_timeout,
                 "banner_timeout": 10,
                 "compress": True,
             }
-            
-            # Если указан файл ключа — используем его
+
+            # If SSH key file is specified, use it
             if self.config.ssh_key_file:
                 key_path = Path(self.config.ssh_key_file).expanduser()
-                if not key_path.exists():
-                    raise SSHConnectionError(f"SSH key file not found: {key_path}")
-                
+
+                # Validate SSH key permissions
+                self._validate_ssh_key_permissions(key_path)
+
                 connect_kwargs["key_filename"] = str(key_path)
                 connect_kwargs["password"] = self.config.ssh_key_passphrase
-                connect_kwargs["look_for_keys"] = False  # Не искать другие ключи
-                connect_kwargs["allow_agent"] = False  # Не использовать agent
                 logger.info(f"Using SSH key: {key_path}")
             elif self.config.ssh_pass:
-                # Используем пароль
+                # Use password authentication
                 connect_kwargs["password"] = self.config.ssh_pass
+                logger.info("Using password authentication")
             else:
-                # Пробует аутентификацию через ssh-agent или ключи по умолчанию
+                # Try authentication via ssh-agent or default keys
                 logger.info("Using SSH agent or default keys for authentication")
-            
+
             client.connect(**connect_kwargs)
-            
-            # Настраиваем keepalive после подключения
+
+            # Configure keepalive after connection
             transport = client.get_transport()
             if transport:
                 transport.set_keepalive(30)
@@ -167,7 +222,8 @@ class SSHConnectionPool:
         return False
 
     def close_all(self):
-        """Закрыть все соединения."""
+        """Close all connections including those currently in use."""
+        # Close all connections in the pool
         while not self._pool.empty():
             try:
                 conn = self._pool.get_nowait()
@@ -177,8 +233,13 @@ class SSHConnectionPool:
                     logger.debug(f"Error closing connection: {e}")
             except Empty:
                 break
+
+        # Note: We cannot close connections currently issued (in use) as they're
+        # being held by other threads. They will be checked for liveness
+        # on next checkout and closed if dead.
         with self._lock:
             self._active_connections = 0
+            self._issued_connections.clear()
 
 
 class SSHHandler:

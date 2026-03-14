@@ -1,16 +1,8 @@
-paramiko>=3.4.0
-pydantic>=2.5.0
-jinja2>=3.1.2
-plotly>=5.18.0
-click>=8.1.7
-tenacity>=8.2.3
-python-dotenv>=1.0.0
-colorama>=0.4.6
-
-# Testing
-pytest>=7.4.3
-pytest-cov>=4.1.0
-
-# Development & Security
-mypy>=1.8.0
-bandit>=1.7.5
+paramiko>=3.4.0,<4.0.0
+pydantic>=2.5.0,<3.0.0
+jinja2>=3.1.2,<4.0.0
+plotly>=5.18.0,<6.0.0
+click>=8.1.7,<9.0.0
+tenacity>=8.2.3,<9.0.0
+python-dotenv>=1.0.0,<2.0.0
+colorama>=0.4.6,<1.0.0

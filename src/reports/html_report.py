@@ -370,7 +370,7 @@ class HTMLReportGenerator(BaseReportGenerator):
 
             for lease in leases:
                 lease_status = getattr(lease, 'lease_status', '')
-                is_dynamic = lease_status == 'Dynamic' or getattr(lease, 'dynamic', False) or getattr(lease, 'dynamic_entry', False)
+                is_dynamic = lease_status == 'Dynamic' or getattr(lease, 'dynamic', False)
                 static_class = '' if is_dynamic else 'static'
                 type_badge = '<span class="badge dynamic">Dynamic</span>' if is_dynamic else '<span class="badge static">Static</span>'
 
@@ -389,7 +389,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
 
             total = len(leases)
-            static_count = sum(1 for l in leases if not getattr(l, 'dynamic', getattr(l, 'dynamic_entry', False)))
+            static_count = sum(1 for l in leases if not getattr(l, 'dynamic', False))
             dynamic_count = total - static_count
 
             return f'''
