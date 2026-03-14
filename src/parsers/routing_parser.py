@@ -29,15 +29,41 @@ ROUTE_KNOWN_FIELDS = {
 
 @lru_cache(maxsize=256)
 def _parse_route_line_cached(line: str) -> Dict[str, str]:
-    """Кэшированная функция для парсинга строки маршрута."""
+    """Кэшированная функция для парсинга строки маршрута.
+
+    Handles RouterOS v7 format with status prefixes.
+    """
+    # Remove leading whitespace from RouterOS v7 format
+    line = line.lstrip()
+
     route_dict = {}
-    for part in line.split():
-        if '=' in part:
-            try:
-                k, v = part.split('=', 1)
-                route_dict[k] = v
-            except ValueError:
-                continue
+
+    # RouterOS v7 format: "DAc   dst-address=172.18.0.0/24 routing-table=main gateway=internal"
+    # The status prefix (DAc, DAo, etc.) is followed by multiple spaces
+    # We need to skip it and find the first valid key-value pair
+
+    # Known RouterOS v7 status prefixes to skip
+    status_prefixes = ['DAc', 'DAo', 'DAs', 'DAi', 'DAv', 'DD', 'DC', 'DH', 'DI', 'DA',
+                     'RAc', 'RAo', 'RAs', 'RAi', 'RAv', 'RD', 'RC', 'RH', 'RI', 'RA',
+                     'H', 'B', 'C', 'O', 'I', 'U', 'D']
+
+    # Split the line and find the first key that contains '=' and is not a status prefix
+    parts = line.split()
+    for part in parts:
+        if '=' in part and part.split('=', 1)[0] not in status_prefixes:
+            # Found a valid key=value pair
+            k, v = part.split('=', 1)
+            route_dict[k] = v
+
+            # Look for more values in remaining parts
+            remaining_idx = parts.index(part) + 1
+            for remaining_part in parts[remaining_idx:]:
+                if '=' in remaining_part:
+                    k, v = remaining_part.split('=', 1)
+                    route_dict[k] = v
+
+            break
+
     return route_dict
 
 
@@ -86,14 +112,8 @@ def parse_routing_rules(results: List) -> List[dict]:
         if r.command.startswith(COMMAND_ROUTING_RULE_PATTERN):
             for line in r.stdout.split('\n'):
                 if 'action=' in line or 'src-address=' in line or 'dst-address=' in line:
-                    rule_dict = {}
-                    for part in line.split():
-                        if '=' in part:
-                            try:
-                                k, v = part.split('=', 1)
-                                rule_dict[k] = v
-                            except ValueError:
-                                continue
+                    # Reuse the smart parsing function from routes
+                    rule_dict = _parse_route_line_cached(line)
                     routing_rules.append(rule_dict)
     return routing_rules
 
@@ -135,14 +155,8 @@ def parse_dns_config(results: List) -> DNSInfo:
             # Parse static DNS entries
             for line in r.stdout.split('\n'):
                 if 'name=' in line and 'address=' in line:
-                    entry = {}
-                    for part in line.split():
-                        if '=' in part:
-                            try:
-                                k, v = part.split('=', 1)
-                                entry[k] = v
-                            except ValueError:
-                                continue
+                    # Reuse the smart parsing function
+                    entry = _parse_route_line_cached(line)
                     dns_info.static_entries.append(entry)
     
     return dns_info

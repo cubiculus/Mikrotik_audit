@@ -38,15 +38,60 @@ MANGLE_KNOWN_FIELDS = {
 
 @lru_cache(maxsize=512)
 def _parse_rule_line_cached(line: str) -> Dict[str, str]:
-    """Кэшированная функция для парсинга строки правила в словарь."""
+    """Кэшированная функция для парсинга строки правила в словарь.
+
+    Handles values with spaces by respecting quoted strings.
+    """
+    # Remove leading whitespace from RouterOS v7 format
+    line = line.lstrip()
+
     rule_dict = {}
-    for part in line.split():
-        if '=' in part:
-            try:
-                k, v = part.split('=', 1)
-                rule_dict[k] = v
-            except ValueError:
-                continue
+    i = 0
+    n = len(line)
+
+    while i < n:
+        # Skip whitespace
+        while i < n and line[i].isspace():
+            i += 1
+
+        if i >= n:
+            break
+
+        # Find key
+        key_start = i
+        while i < n and line[i] != '=':
+            i += 1
+        key = line[key_start:i]
+
+        if i >= n or line[i] != '=':
+            break
+        i += 1  # Skip '='
+
+        # Skip whitespace after '='
+        while i < n and line[i].isspace():
+            i += 1
+
+        if i >= n:
+            break
+
+        # Find value (handle quoted strings)
+        if line[i] == '"':
+            # Quoted value
+            value_start = i + 1
+            i = value_start
+            while i < n and line[i] != '"':
+                i += 1
+            value = line[value_start:i]
+            i += 1  # Skip closing quote
+        else:
+            # Unquoted value (read until next whitespace)
+            value_start = i
+            while i < n and not line[i].isspace():
+                i += 1
+            value = line[value_start:i]
+
+        rule_dict[key] = value
+
     return rule_dict
 
 
@@ -65,30 +110,38 @@ def parse_nat_rules(results: List) -> List[NATRule]:
     nat_rules = []
     for r in results:
         if r.command.startswith(COMMAND_PATTERN_NAT):
-            for line in r.stdout.split('\n'):
+            # Process output line by line to handle comments
+            lines = r.stdout.split('\n')
+            i = 0
+            while i < len(lines):
+                line = lines[i].lstrip()
+
+                # Skip empty lines
+                if not line:
+                    i += 1
+                    continue
+
+                # Check if this is a comment line (starts with ';;')
+                if line.startswith(';;'):
+                    # Save as comment for the next rule
+                    comment_text = line[2:].strip()  # Remove ';; ' and whitespace
+                    i += 1
+                    # Next line should be the actual rule
+                    if i < len(lines):
+                        next_line = lines[i].lstrip()
+                        if next_line and 'action=' in next_line:
+                            rule_dict = _parse_rule_line(next_line)
+                            if 'comment=' not in rule_dict and comment_text:
+                                rule_dict['comment'] = comment_text
+                            nat_rules.append(rule_dict)
+                            i += 1
+                    continue
+
+                # If line contains action=, it's a rule
                 if 'action=' in line:
                     rule_dict = _parse_rule_line(line)
-                    rule = NATRule()
-                    rule.chain = rule_dict.get('chain', '')
-                    rule.action = rule_dict.get('action', '')
-                    rule.disabled = rule_dict.get('disabled', 'false').lower() in ('yes', 'true')
-                    rule.comment = rule_dict.get('comment', '')
-                    rule.src_address = rule_dict.get('src-address', '')
-                    rule.dst_address = rule_dict.get('dst-address', '')
-                    rule.src_address_list = rule_dict.get('src-address-list', '')
-                    rule.dst_address_list = rule_dict.get('dst-address-list', '')
-                    rule.protocol = rule_dict.get('protocol', '')
-                    rule.src_port = rule_dict.get('src-port', '')
-                    rule.dst_port = rule_dict.get('dst-port', '')
-                    rule.to_addresses = rule_dict.get('to-addresses', '')
-                    rule.to_ports = rule_dict.get('to-ports', '')
-                    rule.out_interface = rule_dict.get('out-interface', '')
-                    rule.in_interface = rule_dict.get('in-interface', '')
-                    rule.in_interface_list = rule_dict.get('in-interface-list', '')
-                    rule.routing_mark = rule_dict.get('routing-mark', '')
-                    rule.log = rule_dict.get('log', '')
-                    rule.other = _build_other_fields(rule_dict, NAT_KNOWN_FIELDS)
-                    nat_rules.append(rule)
+                    nat_rules.append(rule_dict)
+                i += 1
     return nat_rules
 
 
@@ -97,35 +150,38 @@ def parse_filter_rules(results: List) -> List[FilterRule]:
     filter_rules = []
     for r in results:
         if r.command.startswith(COMMAND_PATTERN_FILTER):
-            for line in r.stdout.split('\n'):
+            # Process output line by line to handle comments
+            lines = r.stdout.split('\n')
+            i = 0
+            while i < len(lines):
+                line = lines[i].lstrip()
+
+                # Skip empty lines
+                if not line:
+                    i += 1
+                    continue
+
+                # Check if this is a comment line (starts with ';;')
+                if line.startswith(';;'):
+                    # Save as comment for the next rule
+                    comment_text = line[2:].strip()  # Remove ';; ' and whitespace
+                    i += 1
+                    # Next line should be the actual rule
+                    if i < len(lines):
+                        next_line = lines[i].lstrip()
+                        if next_line and 'action=' in next_line:
+                            rule_dict = _parse_rule_line(next_line)
+                            if 'comment=' not in rule_dict and comment_text:
+                                rule_dict['comment'] = comment_text
+                            filter_rules.append(rule_dict)
+                            i += 1
+                    continue
+
+                # If line contains action=, it's a rule
                 if 'action=' in line:
                     rule_dict = _parse_rule_line(line)
-                    rule = FilterRule()
-                    rule.chain = rule_dict.get('chain', '')
-                    rule.action = rule_dict.get('action', '')
-                    rule.disabled = rule_dict.get('disabled', 'false').lower() in ('yes', 'true')
-                    rule.comment = rule_dict.get('comment', '')
-                    rule.src_address = rule_dict.get('src-address', '')
-                    rule.dst_address = rule_dict.get('dst-address', '')
-                    rule.src_address_list = rule_dict.get('src-address-list', '')
-                    rule.dst_address_list = rule_dict.get('dst-address-list', '')
-                    rule.protocol = rule_dict.get('protocol', '')
-                    rule.src_port = rule_dict.get('src-port', '')
-                    rule.dst_port = rule_dict.get('dst-port', '')
-                    rule.in_interface = rule_dict.get('in-interface', '')
-                    rule.out_interface = rule_dict.get('out-interface', '')
-                    rule.in_interface_list = rule_dict.get('in-interface-list', '')
-                    rule.out_interface_list = rule_dict.get('out-interface-list', '')
-                    rule.connection_state = rule_dict.get('connection-state', '')
-                    rule.connection_nat_state = rule_dict.get('connection-nat-state', '')
-                    rule.connection_type = rule_dict.get('connection-type', '')
-                    rule.log = rule_dict.get('log', '')
-                    rule.log_prefix = rule_dict.get('log-prefix', '')
-                    rule.packet_mark = rule_dict.get('packet-mark', '')
-                    rule.connection_mark = rule_dict.get('connection-mark', '')
-                    rule.routing_mark = rule_dict.get('routing-mark', '')
-                    rule.other = _build_other_fields(rule_dict, FILTER_KNOWN_FIELDS)
-                    filter_rules.append(rule)
+                    filter_rules.append(rule_dict)
+                i += 1
     return filter_rules
 
 
@@ -134,25 +190,36 @@ def parse_mangle_rules(results: List) -> List[MangleRule]:
     mangle_rules = []
     for r in results:
         if r.command.startswith(COMMAND_PATTERN_MANGLE):
-            for line in r.stdout.split('\n'):
-                if 'action=' in line:
+            # Process output line by line to handle comments
+            lines = r.stdout.split('\n')
+            i = 0
+            while i < len(lines):
+                line = lines[i].lstrip()
+
+                # Skip empty lines
+                if not line:
+                    i += 1
+                    continue
+
+                # Check if this is a comment line (starts with ';;')
+                if line.startswith(';;'):
+                    # Save as comment for the next rule
+                    comment_text = line[2:].strip()  # Remove ';; ' and whitespace
+                    i += 1
+                    # Next line should be the actual rule
+                    if i < len(lines):
+                        next_line = lines[i].lstrip()
+                        if next_line and ('action=' in next_line or 'chain=' in next_line):
+                            rule_dict = _parse_rule_line(next_line)
+                            if 'comment=' not in rule_dict and comment_text:
+                                rule_dict['comment'] = comment_text
+                            mangle_rules.append(rule_dict)
+                            i += 1
+                    continue
+
+                # If line contains action= or chain=, it's a rule
+                if 'action=' in line or 'chain=' in line:
                     rule_dict = _parse_rule_line(line)
-                    rule = MangleRule()
-                    rule.action = rule_dict.get('action', '')
-                    rule.chain = rule_dict.get('chain', '')
-                    rule.disabled = rule_dict.get('disabled', 'false').lower() in ('yes', 'true')
-                    rule.comment = rule_dict.get('comment', '')
-                    rule.src_address = rule_dict.get('src-address', '')
-                    rule.dst_address = rule_dict.get('dst-address', '')
-                    rule.protocol = rule_dict.get('protocol', '')
-                    rule.dst_port = rule_dict.get('dst-port', '')
-                    rule.src_port = rule_dict.get('src-port', '')
-                    rule.new_connection_mark = rule_dict.get('new-connection-mark', '')
-                    rule.new_routing_mark = rule_dict.get('new-routing-mark', '')
-                    rule.routing_mark = rule_dict.get('routing-mark', '')
-                    rule.passthrough = rule_dict.get('passthrough', '')
-                    rule.src_address_list = rule_dict.get('src-address-list', '')
-                    rule.dst_address_list = rule_dict.get('dst-address-list', '')
-                    rule.other = _build_other_fields(rule_dict, MANGLE_KNOWN_FIELDS)
-                    mangle_rules.append(rule)
+                    mangle_rules.append(rule_dict)
+                i += 1
     return mangle_rules

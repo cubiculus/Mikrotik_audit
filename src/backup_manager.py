@@ -65,13 +65,19 @@ class BackupManager:
                     "insufficient privileges",
                     "no write permission",
                     "access denied",
-                    "failure: no such item or access denied"
+                    "failure: no such item or access denied",
+                    "no such user group",
+                    "can not do that",
+                    "not enough permissions",  # RouterOS specific error message
                 ]
 
                 if any(err in error_msg.lower() for err in permission_errors):
                     self._permission_denied = True
                     backup_result.status = "skipped"
-                    backup_result.error_message = "Insufficient permissions - backup skipped"
+                    backup_result.error_message = (
+                        "Insufficient permissions: backup requires 'write' privileges. "
+                        "Use a user with 'write' or 'full' access level."
+                    )
                     logger.warning(
                         f"{Fore.YELLOW}  ⚠ Backup skipped: User does not have write permissions{Style.RESET_ALL}"
                     )
@@ -80,13 +86,20 @@ class BackupManager:
                     )
                 else:
                     backup_result.status = "failed"
-                    backup_result.error_message = stderr or "Backup command failed"
+                    backup_result.error_message = f"Backup command failed: {error_msg[:200]}"
                     logger.error(f"Backup failed: {backup_result.error_message}")
 
                 return backup_result
 
+            # Check for success indicators (RouterOS may return different success messages)
+            success_indicators = [
+                "Configuration backup saved",
+                "Backup file created",
+                "Backup saved"
+            ]
+
             # Backup created successfully
-            if "Configuration backup saved" in output:
+            if any(indicator in output for indicator in success_indicators):
                 backup_result.status = "success"
                 backup_filename = f"audit_backup_{backup_timestamp}.backup"
 
@@ -104,7 +117,17 @@ class BackupManager:
                 self._cleanup_backup(backup_filename)
 
             else:
-                backup_result.error_message = "Unexpected output from backup command"
+                # Unexpected output - try to extract error message
+                error_msg = "Backup command returned unexpected response"
+                if output:
+                    # Check for error keywords in output
+                    error_keywords = ["error", "failed", "cannot", "permission", "denied"]
+                    if any(kw in output.lower() for kw in error_keywords):
+                        error_msg = f"Backup failed: {output[:200]}"
+                    else:
+                        error_msg = f"Unexpected output: {output[:100]}"
+
+                backup_result.error_message = error_msg
                 backup_result.status = "failed"
                 logger.error(f"Backup failed: {backup_result.error_message}")
 

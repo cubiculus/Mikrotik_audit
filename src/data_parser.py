@@ -213,11 +213,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"dns:{dns_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.dns = cached
+                from src.models import DNSInfo
+                overview.dns = DNSInfo(**cached)
                 logger.debug("Using cached DNS data")
             else:
                 overview.dns = parse_dns_config(results)
-                self._save_to_cache(cache_key, overview.dns, persist=True)
+                self._save_to_cache(cache_key, overview.dns.__dict__, persist=True)
 
         # Parse routing rules with caching
         routing_output = '\n'.join([r.stdout for r in results if '/ip route' in r.command or '/routing' in r.command])
@@ -225,11 +226,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"routing_rules:{routing_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.routing_rules = cached
+                from src.models import RoutingRule
+                overview.routing_rules = [RoutingRule(**r) for r in cached]
                 logger.debug("Using cached routing rules")
             else:
                 overview.routing_rules = parse_routing_rules(results)
-                self._save_to_cache(cache_key, overview.routing_rules, persist=True)
+                self._save_to_cache(cache_key, [r.__dict__ for r in overview.routing_rules], persist=True)
 
         # Parse routes with caching
         routes_output = '\n'.join([r.stdout for r in results if '/ip route' in r.command])
@@ -237,11 +239,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"routes:{routes_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.routes = cached
+                from src.models import Route
+                overview.routes = [Route(**r) for r in cached]
                 logger.debug("Using cached routes")
             else:
                 overview.routes = parse_routes(results)
-                self._save_to_cache(cache_key, overview.routes, persist=True)
+                self._save_to_cache(cache_key, [r.__dict__ for r in overview.routes], persist=True)
 
         # Parse mangle rules with caching
         mangle_output = '\n'.join([r.stdout for r in results if '/ip firewall mangle' in r.command])
@@ -249,11 +252,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"mangle_rules:{mangle_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.mangle_rules = cached
+                from src.models import MangleRule
+                overview.mangle_rules = [MangleRule(**r) for r in cached]
                 logger.debug("Using cached mangle rules")
             else:
                 overview.mangle_rules = parse_mangle_rules(results)
-                self._save_to_cache(cache_key, overview.mangle_rules, persist=True)
+                self._save_to_cache(cache_key, [r.__dict__ for r in overview.mangle_rules], persist=True)
 
         # Parse NAT rules with caching
         nat_output = '\n'.join([r.stdout for r in results if '/ip firewall nat' in r.command])
@@ -261,11 +265,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"nat_rules:{nat_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.nat_rules = cached
+                from src.models import NATRule
+                overview.nat_rules = [NATRule(**r) for r in cached]
                 logger.debug("Using cached NAT rules")
             else:
                 overview.nat_rules = parse_nat_rules(results)
-                self._save_to_cache(cache_key, overview.nat_rules, persist=True)
+                self._save_to_cache(cache_key, [r.__dict__ for r in overview.nat_rules], persist=True)
 
         # Parse Filter rules with caching
         filter_output = '\n'.join([r.stdout for r in results if '/ip firewall filter' in r.command])
@@ -273,11 +278,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"filter_rules:{filter_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                overview.filter_rules = cached
+                from src.models import FilterRule
+                overview.filter_rules = [FilterRule(**r) for r in cached]
                 logger.debug("Using cached filter rules")
             else:
                 overview.filter_rules = parse_filter_rules(results)
-                self._save_to_cache(cache_key, overview.filter_rules, persist=True)
+                self._save_to_cache(cache_key, [r.__dict__ for r in overview.filter_rules], persist=True)
         
         return overview
     

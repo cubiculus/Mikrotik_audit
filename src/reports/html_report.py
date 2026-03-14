@@ -280,12 +280,22 @@ class HTMLReportGenerator(BaseReportGenerator):
                 html += f"<br><strong style='color:#f59e0b'>⚠️ Download Warning:</strong> {backup_result.download_error}"
             html += "</p></div>"
             return html
+        elif backup_result.status == "skipped":
+            html = "<div style='background:#fef3c7;padding:20px;border-radius:8px;border-left:4px solid #f59e0b'>"
+            html += "<h3 style='margin:0;color:#92400e'>⚠️ Backup Skipped</h3>"
+            html += "<p style='margin:5px 0;color:#92400e'>"
+            html += f"<strong>Timestamp:</strong> {backup_result.timestamp}<br>"
+            html += f"<strong>Reason:</strong> {backup_result.error_message or 'Not required'}<br>"
+            html += "<em>Note: This does not affect the audit results. Only the backup file was not created.</em>"
+            html += "</p></div>"
+            return html
         else:
             html = "<div style='background:#fee2e2;padding:20px;border-radius:8px;border-left:4px solid #ef4444'>"
             html += "<h3 style='margin:0;color:#991b1b'>❌ Backup Failed</h3>"
             html += "<p style='margin:5px 0;color:#991b1b'>"
             html += f"<strong>Timestamp:</strong> {backup_result.timestamp}<br>"
-            html += f"<strong>Error:</strong> {backup_result.error_message or 'Unknown'}"
+            html += f"<strong>Error:</strong> {backup_result.error_message or 'Unknown error'}<br>"
+            html += "<em>Note: This does not affect the audit results. Only the backup file was not created.</em>"
             html += "</p></div>"
             return html
 
@@ -353,11 +363,158 @@ class HTMLReportGenerator(BaseReportGenerator):
 
     def _create_traffic_flow_section(self, overview: Optional[NetworkOverview]) -> str:
         """Create HTML traffic flow section."""
-        # Implementation continues with mangle rules, routing rules, etc.
-        # For brevity, using simplified version - full implementation would be here
         if not overview:
             return '<p style="color: #666;">No traffic marking or routing rules found.</p>'
-        return '<p>Traffic flow section (implementation continues...)</p>'
+
+        # Check for mangle rules and routing rules
+        has_content = False
+        content_parts = []
+
+        # Mangle rules
+        if hasattr(overview, 'mangle_rules') and overview.mangle_rules:
+            has_content = True
+            mangle_rows = []
+
+            for idx, rule in enumerate(overview.mangle_rules[:50]):  # Limit to 50 rules
+                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
+                comment = rule.comment or ""
+
+                mangle_rows.append(f'''
+                    <tr class="{'disabled-rule' if rule.disabled else ''}">
+                        <td>{idx + 1}</td>
+                        <td><strong>{rule.chain or "prerouting"}</strong></td>
+                        <td>{rule.action or "passthrough"}</td>
+                        <td>{rule.new_connection_mark or rule.new_routing_mark or "-"}</td>
+                        <td>{rule.protocol or "-"}</td>
+                        <td>{rule.src_address or "-"}</td>
+                        <td>{rule.dst_address or "-"}</td>
+                        <td>{comment[:30] + "..." if len(comment) > 30 else comment}</td>
+                        <td>{disabled_badge}</td>
+                    </tr>
+                ''')
+
+            more_rules = len(overview.mangle_rules) - 50
+            more_html = f'<tr><td colspan="9" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more mangle rules</em></td></tr>' if more_rules > 0 else ''
+
+            content_parts.append(f'''
+                <div class="info-card" style="margin-bottom: 20px;">
+                    <h4>Mangle Rules (Traffic Marking)</h4>
+                    <p style="margin-bottom:10px;color:#666;font-size:0.9em;">Total rules: {len(overview.mangle_rules)}</p>
+                    <table class="rules-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Chain</th>
+                                <th>Action</th>
+                                <th>Connection/Route Mark</th>
+                                <th>Protocol</th>
+                                <th>Src Address</th>
+                                <th>Dst Address</th>
+                                <th>Comment</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(mangle_rows)}{more_html}</tbody>
+                    </table>
+                </div>
+            ''')
+
+        # Routing rules
+        if hasattr(overview, 'routing_rules') and overview.routing_rules:
+            has_content = True
+            routing_rows = []
+
+            for idx, rule in enumerate(overview.routing_rules[:30]):  # Limit to 30 rules
+                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
+                comment = getattr(rule, 'comment', '') or ""
+
+                routing_rows.append(f'''
+                    <tr class="{'disabled-rule' if rule.disabled else ''}">
+                        <td>{idx + 1}</td>
+                        <td>{getattr(rule, 'action', 'accept')}</td>
+                        <td>{getattr(rule, 'src_address', '-')}</td>
+                        <td>{getattr(rule, 'dst_address', '-')}</td>
+                        <td>{getattr(rule, 'in_interface', '-')}</td>
+                        <td>{getattr(rule, 'out_interface', '-')}</td>
+                        <td>{comment[:30] + "..." if len(comment) > 30 else comment}</td>
+                        <td>{disabled_badge}</td>
+                    </tr>
+                ''')
+
+            more_rules = len(overview.routing_rules) - 30
+            more_html = f'<tr><td colspan="8" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more routing rules</em></td></tr>' if more_rules > 0 else ''
+
+            content_parts.append(f'''
+                <div class="info-card">
+                    <h4>Routing Rules</h4>
+                    <p style="margin-bottom:10px;color:#666;font-size:0.9em;">Total rules: {len(overview.routing_rules)}</p>
+                    <table class="rules-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Action</th>
+                                <th>Src Address</th>
+                                <th>Dst Address</th>
+                                <th>In Interface</th>
+                                <th>Out Interface</th>
+                                <th>Comment</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(routing_rows)}{more_html}</tbody>
+                    </table>
+                </div>
+            ''')
+
+        # Routes
+        if hasattr(overview, 'routes') and overview.routes:
+            has_content = True
+            route_rows = []
+
+            for idx, route in enumerate(overview.routes[:30]):  # Limit to 30 routes
+                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if route.disabled else ''
+                comment = route.comment or ""
+
+                route_rows.append(f'''
+                    <tr class="{'disabled-rule' if route.disabled else ''}">
+                        <td>{idx + 1}</td>
+                        <td>{route.dst_address or "-"}</td>
+                        <td>{route.gateway or "-"}</td>
+                        <td>{route.routing_mark or "-"}</td>
+                        <td>{route.distance or "-"}</td>
+                        <td>{comment[:30] + "..." if len(comment) > 30 else comment}</td>
+                        <td>{disabled_badge}</td>
+                    </tr>
+                ''')
+
+            more_rules = len(overview.routes) - 30
+            more_html = f'<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more routes</em></td></tr>' if more_rules > 0 else ''
+
+            content_parts.append(f'''
+                <div class="info-card" style="margin-bottom: 20px;">
+                    <h4>IP Routes</h4>
+                    <p style="margin-bottom:10px;color:#666;font-size:0.9em;">Total routes: {len(overview.routes)}</p>
+                    <table class="rules-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Destination</th>
+                                <th>Gateway</th>
+                                <th>Routing Mark</th>
+                                <th>Distance</th>
+                                <th>Comment</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(route_rows)}{more_html}</tbody>
+                    </table>
+                </div>
+            ''')
+
+        if not has_content:
+            return '<p style="color: #666;">No traffic marking or routing rules found.</p>'
+
+        return ''.join(content_parts)
 
     def _create_devices_section(self, overview: Optional[NetworkOverview]) -> str:
         """Create HTML devices and DHCP leases section."""
@@ -417,12 +574,161 @@ class HTMLReportGenerator(BaseReportGenerator):
 
     def _create_nat_rules_section(self, overview: Optional[NetworkOverview]) -> str:
         """Create HTML NAT rules section."""
-        if not overview or not overview.nat_rules:
+        if not overview or not hasattr(overview, 'nat_rules') or not overview.nat_rules:
             return '<p style="color: #666;">No NAT firewall rules found.</p>'
-        return '<p>NAT rules section (implementation continues...)</p>'
+
+        try:
+            nat_rows = []
+
+            for idx, rule in enumerate(overview.nat_rules[:50]):  # Limit to 50 rules
+                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
+                log_badge = '<span style="color:#3b82f6;font-size:0.85em;">📋 logged</span>' if rule.log == 'yes' else ''
+                comment = rule.comment or ""
+
+                nat_rows.append(f'''
+                    <tr class="{'disabled-rule' if rule.disabled else ''}">
+                        <td>{idx + 1}</td>
+                        <td><strong>{rule.chain or "srcnat"}</strong></td>
+                        <td><span style="color:#10b981;">{rule.action or "masquerade"}</span></td>
+                        <td>{rule.to_addresses or "-"}</td>
+                        <td>{rule.to_ports or "-"}</td>
+                        <td>{rule.protocol or "-"}</td>
+                        <td>{rule.src_address or "-"}</td>
+                        <td>{rule.dst_address or "-"}</td>
+                        <td>{rule.src_port or "-"}</td>
+                        <td>{rule.dst_port or "-"}</td>
+                        <td>{rule.in_interface or "-"}</td>
+                        <td>{rule.out_interface or "-"}</td>
+                        <td>{comment[:25] + "..." if len(comment) > 25 else comment}</td>
+                        <td>{disabled_badge} {log_badge}</td>
+                    </tr>
+                ''')
+
+            more_rules = len(overview.nat_rules) - 50
+            more_html = f'<tr><td colspan="14" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more NAT rules</em></td></tr>' if more_rules > 0 else ''
+
+            # Count rules by chain
+            srcnat_count = sum(1 for r in overview.nat_rules if r.chain == 'srcnat')
+            dstnat_count = sum(1 for r in overview.nat_rules if r.chain == 'dstnat')
+            disabled_count = sum(1 for r in overview.nat_rules if r.disabled)
+
+            return f'''
+                <div style="margin-bottom: 15px;">
+                    <span style="margin-right: 15px;"><strong>Total:</strong> {len(overview.nat_rules)} rules</span>
+                    <span style="margin-right: 15px;"><strong>srcnat:</strong> {srcnat_count}</span>
+                    <span style="margin-right: 15px;"><strong>dstnat:</strong> {dstnat_count}</span>
+                    <span style="margin-right: 15px;"><strong>Disabled:</strong> {disabled_count}</span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="rules-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Chain</th>
+                                <th>Action</th>
+                                <th>To Addr</th>
+                                <th>To Port</th>
+                                <th>Proto</th>
+                                <th>Src Addr</th>
+                                <th>Dst Addr</th>
+                                <th>Src Port</th>
+                                <th>Dst Port</th>
+                                <th>In Iface</th>
+                                <th>Out Iface</th>
+                                <th>Comment</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(nat_rows)}{more_html}</tbody>
+                    </table>
+                </div>
+            '''
+        except Exception as e:
+            logger.error(f"Error creating NAT rules section: {e}")
+            return f'<p style="color: #d11;">Error creating NAT rules section: {e}</p>'
 
     def _create_filter_rules_section(self, overview: Optional[NetworkOverview]) -> str:
         """Create HTML filter rules section."""
-        if not overview or not overview.filter_rules:
+        if not overview or not hasattr(overview, 'filter_rules') or not overview.filter_rules:
             return '<p style="color: #666;">No Filter firewall rules found.</p>'
-        return '<p>Filter rules section (implementation continues...)</p>'
+
+        try:
+            filter_rows = []
+
+            for idx, rule in enumerate(overview.filter_rules[:50]):  # Limit to 50 rules
+                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
+                log_badge = '<span style="color:#3b82f6;font-size:0.85em;">📋 logged</span>' if rule.log == 'yes' else ''
+
+                # Color code based on action
+                action_colors = {
+                    'accept': 'color:#10b981;',
+                    'drop': 'color:#ef4444;',
+                    'reject': 'color:#f59e0b;',
+                    'jump': 'color:#8b5cf6;',
+                    'return': 'color:#6b7280;',
+                }
+                action_style = action_colors.get(rule.action, '')
+
+                comment = rule.comment or ""
+
+                filter_rows.append(f'''
+                    <tr class="{'disabled-rule' if rule.disabled else ''}">
+                        <td>{idx + 1}</td>
+                        <td><strong style="{action_style}">{rule.chain or "forward"}</strong></td>
+                        <td style="{action_style}">{rule.action or "accept"}</td>
+                        <td>{rule.protocol or "-"}</td>
+                        <td>{rule.src_address or "-"}</td>
+                        <td>{rule.dst_address or "-"}</td>
+                        <td>{rule.src_port or "-"}</td>
+                        <td>{rule.dst_port or "-"}</td>
+                        <td>{rule.in_interface or "-"}</td>
+                        <td>{rule.out_interface or "-"}</td>
+                        <td>{rule.connection_state or "-"}</td>
+                        <td>{comment[:25] + "..." if len(comment) > 25 else comment}</td>
+                        <td>{disabled_badge} {log_badge}</td>
+                    </tr>
+                ''')
+
+            more_rules = len(overview.filter_rules) - 50
+            more_html = f'<tr><td colspan="13" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more filter rules</em></td></tr>' if more_rules > 0 else ''
+
+            # Count rules by action
+            accept_count = sum(1 for r in overview.filter_rules if r.action == 'accept')
+            drop_count = sum(1 for r in overview.filter_rules if r.action == 'drop')
+            reject_count = sum(1 for r in overview.filter_rules if r.action == 'reject')
+            disabled_count = sum(1 for r in overview.filter_rules if r.disabled)
+
+            return f'''
+                <div style="margin-bottom: 15px;">
+                    <span style="margin-right: 15px;"><strong>Total:</strong> {len(overview.filter_rules)} rules</span>
+                    <span style="margin-right: 15px;color:#10b981;"><strong>Accept:</strong> {accept_count}</span>
+                    <span style="margin-right: 15px;color:#ef4444;"><strong>Drop:</strong> {drop_count}</span>
+                    <span style="margin-right: 15px;color:#f59e0b;"><strong>Reject:</strong> {reject_count}</span>
+                    <span style="margin-right: 15px;"><strong>Disabled:</strong> {disabled_count}</span>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="rules-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Chain</th>
+                                <th>Action</th>
+                                <th>Protocol</th>
+                                <th>Src Addr</th>
+                                <th>Dst Addr</th>
+                                <th>Src Port</th>
+                                <th>Dst Port</th>
+                                <th>In Iface</th>
+                                <th>Out Iface</th>
+                                <th>Conn State</th>
+                                <th>Comment</th>
+                                <th>State</th>
+                            </tr>
+                        </thead>
+                        <tbody>{''.join(filter_rows)}{more_html}</tbody>
+                    </table>
+                </div>
+            '''
+        except Exception as e:
+            logger.error(f"Error creating filter rules section: {e}")
+            return f'<p style="color: #d11;">Error creating filter rules section: {e}</p>'

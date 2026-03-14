@@ -15,8 +15,9 @@ from src.auditor import MikroTikAuditor
 from src.backup_manager import BackupManager
 from src.report_generator import ReportGenerator
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file in project root
+project_root = Path(__file__).parent.parent
+load_dotenv(project_root / '.env')
 
 # Initialize colorama
 init(autoreset=True)
@@ -109,6 +110,11 @@ def main(
 
         # Get SSH password securely from environment or prompt
         ssh_pass = os.getenv("MIKROTIK_PASSWORD")
+        if ssh_pass:
+            logger.debug(f"Password loaded from environment variable (length: {len(ssh_pass)})")
+        else:
+            logger.debug("Password not found in environment variable")
+
         if not ssh_pass and not ssh_key_file:
             # Prompt for password securely if no SSH key provided
             ssh_pass = click.prompt('SSH Password', hide_input=True)
