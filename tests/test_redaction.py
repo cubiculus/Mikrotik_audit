@@ -1,6 +1,5 @@
 """Tests for IP address redaction functionality."""
 
-import pytest
 from src.config import redact_sensitive_data
 
 
@@ -71,38 +70,38 @@ class TestIPRedaction:
 
     def test_serial_number_redaction(self):
         """Test that serial numbers are redacted."""
-        text = "Serial: ABC12345 serial-number: XYZ67890"
+        text = "Serial: ABCD1234 serial-number: EFGH5678"
         result = redact_sensitive_data(text)
         assert "[REDACTED]" in result
-        assert "ABC12345" not in result
-        assert "XYZ67890" not in result
+        assert "ABCD1234" not in result
+        assert "EFGH5678" not in result
 
     def test_password_redaction(self):
         """Test that passwords are redacted."""
-        text = "password=secret123 ppp-secret=hidden"
+        text = "password=pass1234 ppp-secret=hidden"
         result = redact_sensitive_data(text)
         assert "[REDACTED]" in result
-        assert "secret123" not in result
+        assert "pass1234" not in result
         assert "hidden" not in result
 
     def test_mixed_redaction(self):
         """Test mixed content with various sensitive data."""
         text = """
         IP: 8.8.8.8
-        Private IP: 192.168.1.1
-        Serial: ABC12345
-        Password: secret123
+        Private IP: 192.168.100.1
+        Serial: ABCD1234
+        Password: pass1234
         """
         result = redact_sensitive_data(text)
         # Public IP should be masked
         assert "8.8.8.***" in result
         # Private IP should NOT be masked
-        assert "192.168.1.1" in result
+        assert "192.168.100.1" in result
         # Serial should be masked
         assert "[REDACTED]" in result
-        assert "ABC12345" not in result
+        assert "ABCD1234" not in result
         # Password should be masked
-        assert "secret123" not in result
+        assert "pass1234" not in result
 
     def test_empty_text(self):
         """Test that empty text is handled correctly."""

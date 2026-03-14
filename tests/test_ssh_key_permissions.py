@@ -2,13 +2,11 @@
 
 import pytest
 import os
-import stat
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from src.config import RouterConfig
-from src.ssh_handler import SSHHandler, SSHConnectionError, SSHConnectionPool
+from src.ssh_handler import SSHConnectionError, SSHConnectionPool
 
 
 class TestSSHKeyPermissions:
@@ -27,7 +25,7 @@ class TestSSHKeyPermissions:
             os.chmod(key_file, 0o640)  # rw-r-----
 
             config = RouterConfig(
-                router_ip="192.168.1.1",
+                router_ip="192.168.100.1",
                 ssh_port=22,
                 ssh_user="test",
                 ssh_key_file=str(key_file)
@@ -53,7 +51,7 @@ class TestSSHKeyPermissions:
             os.chmod(key_file, 0o644)  # rw-r--r--
 
             config = RouterConfig(
-                router_ip="192.168.1.1",
+                router_ip="192.168.100.1",
                 ssh_port=22,
                 ssh_user="test",
                 ssh_key_file=str(key_file)
@@ -78,7 +76,7 @@ class TestSSHKeyPermissions:
             os.chmod(key_file, 0o600)  # rw-------
 
             config = RouterConfig(
-                router_ip="192.168.1.1",
+                router_ip="192.168.100.1",
                 ssh_port=22,
                 ssh_user="test",
                 ssh_key_file=str(key_file)
@@ -98,7 +96,7 @@ class TestSSHKeyPermissions:
             key_file.write_text("-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----")
 
             config = RouterConfig(
-                router_ip="192.168.1.1",
+                router_ip="192.168.100.1",
                 ssh_port=22,
                 ssh_user="test",
                 ssh_key_file=str(key_file)
@@ -111,7 +109,7 @@ class TestSSHKeyPermissions:
     def test_ssh_key_not_found(self):
         """Test that missing SSH key file raises error."""
         config = RouterConfig(
-            router_ip="192.168.1.1",
+            router_ip="192.168.100.1",
             ssh_port=22,
             ssh_user="test",
             ssh_key_file="/nonexistent/key.pem"

@@ -1,7 +1,7 @@
 """Tests for ssh_handler module."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from src.config import RouterConfig
 from src.ssh_handler import SSHHandler, SSHConnectionError, SSHConnectionPool
 
@@ -33,20 +33,20 @@ class TestSSHConnectionPool:
     def test_pool_create_connection(self):
         """Test connection creation."""
         config = RouterConfig(
-            router_ip="192.168.1.1",
+            router_ip="192.168.100.1",
             ssh_port=22,
             ssh_user="admin",
             ssh_pass="test"
         )
         pool = SSHConnectionPool(config, max_connections=3)
-        
+
         # Mock paramiko to avoid actual connection
         with patch('src.ssh_handler.paramiko.SSHClient') as mock_client:
             mock_transport = MagicMock()
             mock_client.return_value.get_transport.return_value = mock_transport
-            
+
             connection = pool._create_connection()
-            
+
             assert connection is not None
             mock_client.return_value.connect.assert_called_once()
 
@@ -55,13 +55,13 @@ class TestSSHConnectionPool:
         import paramiko
         config = RouterConfig()
         pool = SSHConnectionPool(config, max_connections=3)
-        
+
         with patch('src.ssh_handler.paramiko.SSHClient') as mock_client:
             mock_client.return_value.connect.side_effect = paramiko.AuthenticationException("Auth failed")
-            
+
             with pytest.raises(SSHConnectionError) as exc_info:
                 pool._create_connection()
-            
+
             assert "Authentication failed" in str(exc_info.value)
 
     def test_pool_create_connection_ssh_error(self):
@@ -69,48 +69,48 @@ class TestSSHConnectionPool:
         import paramiko
         config = RouterConfig()
         pool = SSHConnectionPool(config, max_connections=3)
-        
+
         with patch('src.ssh_handler.paramiko.SSHClient') as mock_client:
             mock_client.return_value.connect.side_effect = paramiko.SSHException("SSH error")
-            
+
             with pytest.raises(SSHConnectionError) as exc_info:
                 pool._create_connection()
-            
+
             assert "SSH error" in str(exc_info.value)
 
     def test_is_connection_alive_false(self):
         """Test connection alive check with dead connection."""
         config = RouterConfig()
         pool = SSHConnectionPool(config, max_connections=3)
-        
+
         mock_client = MagicMock()
         mock_client.get_transport.return_value = None
-        
+
         assert pool._is_connection_alive(mock_client) is False
 
     def test_is_connection_alive_exception(self):
         """Test connection alive check with exception."""
         config = RouterConfig()
         pool = SSHConnectionPool(config, max_connections=3)
-        
+
         mock_client = MagicMock()
         mock_client.get_transport.side_effect = Exception("Test error")
-        
+
         assert pool._is_connection_alive(mock_client) is False
 
     def test_close_all(self):
         """Test closing all connections."""
         config = RouterConfig()
         pool = SSHConnectionPool(config, max_connections=3)
-        
+
         # Add mock connections to pool
         mock_conn1 = MagicMock()
         mock_conn2 = MagicMock()
         pool._pool.put(mock_conn1)
         pool._pool.put(mock_conn2)
-        
+
         pool.close_all()
-        
+
         mock_conn1.close.assert_called_once()
         mock_conn2.close.assert_called_once()
         assert pool._active_connections == 0
@@ -151,10 +151,10 @@ class TestSSHHandler:
         """Test failed connection."""
         config = RouterConfig()
         handler = SSHHandler(config)
-        
+
         with patch.object(handler.connection_pool, 'get_connection') as mock_get:
             mock_get.side_effect = SSHConnectionError("Connection failed")
-            
+
             with pytest.raises(SSHConnectionError):
                 handler.connect()
 
@@ -162,22 +162,22 @@ class TestSSHHandler:
         """Test command execution."""
         config = RouterConfig()
         handler = SSHHandler(config)
-        
+
         mock_conn = MagicMock()
         mock_stdin = MagicMock()
         mock_stdout = MagicMock()
         mock_stderr = MagicMock()
-        
+
         mock_conn.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
         mock_stdout.channel.recv_exit_status.return_value = 0
         mock_stdout.read.return_value = b"output"
         mock_stderr.read.return_value = b""
-        
+
         with patch.object(handler.connection_pool, 'get_connection') as mock_get:
             mock_get.return_value.__enter__.return_value = mock_conn
-            
+
             exit_status, stdout, stderr = handler.execute_command("/test command")
-            
+
             assert exit_status == 0
             assert stdout == "output"
             assert stderr == ""
@@ -186,10 +186,10 @@ class TestSSHHandler:
         """Test command execution with error."""
         config = RouterConfig()
         handler = SSHHandler(config)
-        
+
         with patch.object(handler.connection_pool, 'get_connection') as mock_get:
             mock_get.side_effect = SSHConnectionError("Command failed")
-            
+
             with pytest.raises(SSHConnectionError):
                 handler.execute_command("/test command")
 
@@ -206,35 +206,35 @@ class TestSSHHandler:
         """Test get_version_info with identity error."""
         config = RouterConfig()
         handler = SSHHandler(config)
-        
+
         with patch.object(handler, 'execute_command') as mock_exec:
             mock_exec.side_effect = SSHConnectionError("Failed")
-            
+
             info = handler.get_version_info()
-            
+
             assert info["identity"] == "Unknown"
 
     def test_get_version_info_parsing(self):
         """Test get_version_info parsing."""
         config = RouterConfig()
         handler = SSHHandler(config)
-        
+
         identity_output = "name: TestRouter"
         resource_output = """version: 7.10
 uptime: 1h
 board-name: RB750
 architecture-name: arm
 cpu-count: 2"""
-        
+
         with patch.object(handler, 'execute_command') as mock_exec:
             mock_exec.side_effect = [
                 (0, identity_output, ""),
                 (0, resource_output, ""),
                 (0, "", "")
             ]
-            
+
             info = handler.get_version_info()
-            
+
             assert info["identity"] == "TestRouter"
             assert info["version"] == "7.10"
             assert info["cpu_count"] == 2

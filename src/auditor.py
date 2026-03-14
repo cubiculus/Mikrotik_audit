@@ -9,8 +9,8 @@ from typing import List, Optional
 from colorama import Fore, Style
 
 from src.config import (
-    RouterConfig, AuditConfig, AuditLevel, CommandResult,
-    RouterInfo, BackupResult, SecurityIssue, redact_sensitive_data
+    AuditConfig, AuditLevel, CommandResult,
+    RouterInfo, SecurityIssue, redact_sensitive_data
 )
 from src.commands import (
     AUDIT_COMMANDS_BASIC,
@@ -19,6 +19,8 @@ from src.commands import (
 )
 from src.ssh_handler import SSHHandler
 from src.security_analyzer import SecurityAnalyzer
+from src.data_parser import DataParser
+from src.models import NetworkOverview
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,8 @@ class MikroTikAuditor:
         self.results: List[CommandResult] = []
         self.router_info: Optional[RouterInfo] = None
         self._security_issues: List[SecurityIssue] = []
+        self._network_overview: Optional[NetworkOverview] = None
+        self._data_parser: Optional[DataParser] = None
 
     def get_audit_commands(self) -> List[str]:
         """Get commands based on audit level."""
@@ -93,16 +97,16 @@ class MikroTikAuditor:
     def _get_optimal_workers(self) -> int:
         """
         Determine optimal number of workers for I/O-bound SSH tasks.
-        
+
         SSH commands are network-bound (95%+ wait time), not CPU-bound.
         RouterOS typically handles 3-5 parallel SSH sessions well.
         """
         command_count = len(self.get_audit_commands())
-        
+
         # Base workers for I/O-bound tasks (network latency)
         # RouterOS limits: typically 3-5 parallel SSH sessions max
         base_workers = 4
-        
+
         if command_count < 10:
             return min(3, command_count)
         elif command_count < 50:
@@ -220,15 +224,25 @@ class MikroTikAuditor:
                     if result.stderr:
                         result.stderr = redact_sensitive_data(result.stderr)
 
+            # Parse all data
+            logger.info(f"\n{Fore.YELLOW}📊 Parsing collected data...{Style.RESET_ALL}")
+            self._data_parser = DataParser()
+            self._network_overview = self._data_parser.build_network_overview(self.results)
+            logger.info(f"  {Fore.GREEN}✓ Parsed {self._network_overview.total_interfaces} interfaces{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}✓ Parsed {self._network_overview.total_ip_addresses} IP addresses{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}✓ Parsed {self._network_overview.dhcp_leases_count} DHCP leases{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}✓ Parsed {len(self._network_overview.services)} services{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}✓ Parsed {len(self._network_overview.certificates)} certificates{Style.RESET_ALL}")
+
             # Analyze security
-            security_issues = self._analyze_security()
+            self._analyze_security()
 
             # Prepare output directory
             output_dir = Path(self.config.output_dir or f"mikrotik-audit-{self.get_timestamp()}")
 
             # Return output_dir for use by caller
             self._output_dir = output_dir
-            
+
             # Perform backup and generate reports (delegated to caller)
             return True
 
@@ -299,6 +313,10 @@ class MikroTikAuditor:
     def get_security_issues(self) -> List[SecurityIssue]:
         """Get security analysis results."""
         return self._security_issues
+
+    def get_network_overview(self) -> Optional[NetworkOverview]:
+        """Get parsed network overview with all collected data."""
+        return self._network_overview
 
     def get_output_dir(self) -> Optional[Path]:
         """Get output directory path."""

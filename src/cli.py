@@ -102,7 +102,7 @@ def main(
 
     try:
         # Use environment variables for values not provided via CLI
-        router_ip = router_ip or os.getenv("MIKROTIK_IP", "192.168.1.1")
+        router_ip = router_ip or os.getenv("MIKROTIK_IP", "192.168.100.1")
         ssh_port = ssh_port or int(os.getenv("MIKROTIK_PORT", "22"))
         ssh_user = ssh_user or os.getenv("MIKROTIK_USER", "admin")
         ssh_key_file = ssh_key_file or os.getenv("MIKROTIK_SSH_KEY_FILE")
@@ -176,6 +176,9 @@ def main(
         # Get security issues from auditor (analysis already done in run_audit())
         security_issues = auditor.get_security_issues()
 
+        # Get network overview with all parsed data
+        network_overview = auditor.get_network_overview()
+
         # Get output directory from auditor
         output_path = auditor.get_output_dir() or Path(output_dir or f"audit-reports/{auditor.get_timestamp()}")
 
@@ -191,10 +194,10 @@ def main(
         logger.info(f"\n{Fore.YELLOW}📄 Generating reports...{Style.RESET_ALL}")
         generator = ReportGenerator(output_path)
 
-        html_report = generator.generate_html_report(results, security_issues, router_info, backup_result)
-        json_report = generator.generate_json_report(results, security_issues, router_info, backup_result)
-        txt_report = generator.generate_txt_report(results, security_issues, router_info, backup_result)
-        md_report = generator.generate_markdown_report(results, security_issues, router_info, backup_result)
+        html_report = generator.generate_html_report(results, security_issues, router_info, backup_result, network_overview)
+        json_report = generator.generate_json_report(results, security_issues, router_info, backup_result, network_overview)
+        txt_report = generator.generate_txt_report(results, security_issues, router_info, backup_result, network_overview)
+        md_report = generator.generate_markdown_report(results, security_issues, router_info, backup_result, network_overview)
 
         # Print summary
         print_summary(results, security_issues, output_path, html_report, json_report, txt_report, md_report)
@@ -235,7 +238,7 @@ def print_summary(
     logger.info(f"  Output:   {Fore.CYAN}{output_dir}{Style.RESET_ALL}")
     logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
 
-    logger.info(f"Reports saved:")
+    logger.info("Reports saved:")
     logger.info(f"  HTML: {html_report.name}")
     logger.info(f"  JSON: {json_report.name}")
     logger.info(f"  TXT:  {txt_report.name}")

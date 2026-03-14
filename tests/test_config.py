@@ -1,7 +1,6 @@
 """Tests for config module."""
 
 import pytest
-import os
 from pydantic import ValidationError
 
 from src.config import RouterConfig, AuditConfig, AuditLevel
@@ -17,9 +16,9 @@ class TestRouterConfig:
         monkeypatch.delenv("MIKROTIK_PORT", raising=False)
         monkeypatch.delenv("MIKROTIK_USER", raising=False)
         monkeypatch.delenv("MIKROTIK_PASSWORD", raising=False)
-        
+
         config = RouterConfig()
-        assert config.router_ip == "192.168.1.1"
+        assert config.router_ip == "192.168.100.1"
         assert config.ssh_port == 22
         assert config.ssh_user == "admin"
         assert config.connect_timeout == 30
@@ -29,12 +28,12 @@ class TestRouterConfig:
     def test_custom_values(self):
         """Test custom configuration values."""
         config = RouterConfig(
-            router_ip="192.168.88.1",
+            router_ip="192.168.100.1",
             ssh_port=2222,
             ssh_user="test_user",
             ssh_pass="test_pass"
         )
-        assert config.router_ip == "192.168.88.1"
+        assert config.router_ip == "192.168.100.1"
         assert config.ssh_port == 2222
         assert config.ssh_user == "test_user"
         assert config.ssh_pass == "test_pass"
@@ -44,11 +43,11 @@ class TestRouterConfig:
         # Minimum valid port
         config = RouterConfig(ssh_port=1)
         assert config.ssh_port == 1
-        
+
         # Maximum valid port
         config = RouterConfig(ssh_port=65535)
         assert config.ssh_port == 65535
-        
+
         # Common SSH port
         config = RouterConfig(ssh_port=22)
         assert config.ssh_port == 22
@@ -91,13 +90,13 @@ class TestRouterConfig:
 
     def test_environment_variables(self, monkeypatch):
         """Test that environment variables are loaded correctly."""
-        monkeypatch.setenv("MIKROTIK_IP", "10.0.0.1")
+        monkeypatch.setenv("MIKROTIK_IP", "192.168.100.1")
         monkeypatch.setenv("MIKROTIK_PORT", "2222")
         monkeypatch.setenv("MIKROTIK_USER", "env_user")
         monkeypatch.setenv("MIKROTIK_PASSWORD", "env_pass")
-        
+
         config = RouterConfig()
-        assert config.router_ip == "10.0.0.1"
+        assert config.router_ip == "192.168.100.1"
         assert config.ssh_port == 2222
         assert config.ssh_user == "env_user"
         assert config.ssh_pass == "env_pass"

@@ -12,7 +12,6 @@ from src.config import CommandResult, SecurityIssue, RouterInfo, BackupResult
 from src.models import NetworkOverview
 from src.data_parser import DataParser
 
-from src.reports.base_report import BaseReportGenerator
 from src.reports.html_report import HTMLReportGenerator
 from src.reports.json_report import JSONReportGenerator
 from src.reports.txt_report import TXTReportGenerator
@@ -75,7 +74,8 @@ class ReportGenerator:
         results: List[CommandResult],
         security_issues: List[SecurityIssue],
         router_info: RouterInfo,
-        backup_result: Optional[BackupResult] = None
+        backup_result: Optional[BackupResult] = None,
+        network_overview: Optional[NetworkOverview] = None
     ) -> Path:
         """Generate HTML report.
 
@@ -84,12 +84,14 @@ class ReportGenerator:
             security_issues: Security issues found
             router_info: Router information
             backup_result: Backup operation result
+            network_overview: Pre-parsed network overview (optional)
 
         Returns:
             Path to generated HTML report
         """
         logger.info("Generating HTML report...")
-        network_overview = self._get_network_overview(results)
+        if network_overview is None:
+            network_overview = self._get_network_overview(results)
 
         return self.html_generator.generate(
             results=results,
@@ -104,7 +106,8 @@ class ReportGenerator:
         results: List[CommandResult],
         security_issues: List[SecurityIssue],
         router_info: RouterInfo,
-        backup_result: Optional[BackupResult] = None
+        backup_result: Optional[BackupResult] = None,
+        network_overview: Optional[NetworkOverview] = None
     ) -> Path:
         """Generate JSON report.
 
@@ -113,12 +116,14 @@ class ReportGenerator:
             security_issues: Security issues found
             router_info: Router information
             backup_result: Backup operation result
+            network_overview: Pre-parsed network overview (optional)
 
         Returns:
             Path to generated JSON report
         """
         logger.info("Generating JSON report...")
-        network_overview = self._get_network_overview(results)
+        if network_overview is None:
+            network_overview = self._get_network_overview(results)
 
         return self.json_generator.generate(
             results=results,
@@ -133,7 +138,8 @@ class ReportGenerator:
         results: List[CommandResult],
         security_issues: List[SecurityIssue],
         router_info: RouterInfo,
-        backup_result: Optional[BackupResult] = None
+        backup_result: Optional[BackupResult] = None,
+        network_overview: Optional[NetworkOverview] = None
     ) -> Path:
         """Generate TXT report.
 
@@ -142,12 +148,14 @@ class ReportGenerator:
             security_issues: Security issues found
             router_info: Router information
             backup_result: Backup operation result
+            network_overview: Pre-parsed network overview (optional)
 
         Returns:
             Path to generated TXT report
         """
         logger.info("Generating TXT report...")
-        network_overview = self._get_network_overview(results)
+        if network_overview is None:
+            network_overview = self._get_network_overview(results)
 
         return self.txt_generator.generate(
             results=results,
@@ -162,7 +170,8 @@ class ReportGenerator:
         results: List[CommandResult],
         security_issues: List[SecurityIssue],
         router_info: RouterInfo,
-        backup_result: Optional[BackupResult] = None
+        backup_result: Optional[BackupResult] = None,
+        network_overview: Optional[NetworkOverview] = None
     ) -> Path:
         """Generate Markdown report.
 
@@ -171,12 +180,14 @@ class ReportGenerator:
             security_issues: Security issues found
             router_info: Router information
             backup_result: Backup operation result
+            network_overview: Pre-parsed network overview (optional)
 
         Returns:
             Path to generated Markdown report
         """
         logger.info("Generating Markdown report...")
-        network_overview = self._get_network_overview(results)
+        if network_overview is None:
+            network_overview = self._get_network_overview(results)
 
         return self.md_generator.generate(
             results=results,
@@ -191,7 +202,8 @@ class ReportGenerator:
         results: List[CommandResult],
         security_issues: List[SecurityIssue],
         router_info: RouterInfo,
-        backup_result: Optional[BackupResult] = None
+        backup_result: Optional[BackupResult] = None,
+        network_overview: Optional[NetworkOverview] = None
     ) -> tuple:
         """Generate all report formats (HTML, JSON, TXT, Markdown).
 
@@ -200,18 +212,19 @@ class ReportGenerator:
             security_issues: Security issues found
             router_info: Router information
             backup_result: Backup operation result
+            network_overview: Pre-parsed network overview (optional)
 
         Returns:
             Tuple of (HTML path, JSON path, TXT path, Markdown path)
         """
         logger.info("Generating all report formats...")
 
-        html_path = self.generate_html_report(results, security_issues, router_info, backup_result)
-        json_path = self.generate_json_report(results, security_issues, router_info, backup_result)
-        txt_path = self.generate_txt_report(results, security_issues, router_info, backup_result)
-        md_path = self.generate_markdown_report(results, security_issues, router_info, backup_result)
+        html_path = self.generate_html_report(results, security_issues, router_info, backup_result, network_overview)
+        json_path = self.generate_json_report(results, security_issues, router_info, backup_result, network_overview)
+        txt_path = self.generate_txt_report(results, security_issues, router_info, backup_result, network_overview)
+        md_path = self.generate_markdown_report(results, security_issues, router_info, backup_result, network_overview)
 
-        logger.info(f"All reports generated successfully:")
+        logger.info("All reports generated successfully:")
         logger.info(f"  HTML: {html_path}")
         logger.info(f"  JSON: {json_path}")
         logger.info(f"  TXT:  {txt_path}")

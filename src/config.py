@@ -16,7 +16,7 @@ class AuditLevel(str, Enum):
     COMPREHENSIVE = "Comprehensive"
 
 class RouterConfig(BaseModel):
-    router_ip: str = Field(default_factory=lambda: os.getenv("MIKROTIK_IP", "192.168.1.1"))
+    router_ip: str = Field(default_factory=lambda: os.getenv("MIKROTIK_IP", "192.168.100.1"))
     ssh_port: int = Field(default_factory=lambda: int(os.getenv("MIKROTIK_PORT", 22)))
     ssh_user: str = Field(default_factory=lambda: os.getenv("MIKROTIK_USER", "admin"))
     ssh_pass: str = Field(default_factory=lambda: os.getenv("MIKROTIK_PASSWORD", ""))
@@ -69,7 +69,7 @@ class SecurityIssue(BaseModel):
     description: str = ""
     recommendation: str
     command: str = ""
-    
+
     def __init__(self, **data):
         if 'finding' not in data and 'description' in data:
             data['finding'] = data['description']
@@ -160,6 +160,40 @@ def redact_sensitive_data(text: str) -> str:
     # Europe/Moscow -> Europe/[REDACTED]
     result = re.sub(r'(time-zone[-_]?name:\s*\w+)/(\w+)', r'\1/[REDACTED]', result)
     result = re.sub(r'(time-zone[-_]?name=)(\w+)/(\w+)', r'\1\2/[REDACTED]', result)
+
+    # Mask container names (reveal installed software)
+    result = re.sub(r'name="([^"]+)"(?=\s+remote-image=)', r'name="[CONTAINER REDACTED]"', result)
+    result = re.sub(r'hostname="([^"]+)"', r'hostname="[HOST REDACTED]"', result)
+
+    # Mask email addresses (in registry usernames, etc.)
+    result = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL REDACTED]', result)
+
+    # Mask WireGuard public keys (cryptographic identifiers)
+    result = re.sub(r'public-key="[^"]+"', r'public-key="[WG KEY REDACTED]"', result)
+    result = re.sub(r'public-key=([^\s,]+)', r'public-key=[WG KEY REDACTED]', result)
+
+    # Mask endpoint addresses (reveal external services)
+    result = re.sub(r'endpoint-address="?([^"\s]+)"?', r'endpoint-address="[ENDPOINT REDACTED]"', result)
+
+    # Mask dynamic connection info (active SSH sessions)
+    result = re.sub(r'remote=(\d+\.\d+\.\d+\.\d+:\d+)', r'remote=[CONNECTION REDACTED]', result)
+    result = re.sub(r'connected-since=\S+', r'connected-since=[TIME REDACTED]', result)
+
+    # Mask container MAC addresses
+    result = re.sub(r'container-mac-address=([0-9A-Fa-f:]+)', r'container-mac-address=[MAC REDACTED]', result)
+
+    # Mask Docker image tags (reveal software versions)
+    result = re.sub(r'tag="([^"]+)"', r'tag="[TAG REDACTED]"', result)
+    result = re.sub(r'remote-image="([^"]+)"', r'remote-image="[IMAGE REDACTED]"', result)
+
+    # Mask file paths (reveal directory structure)
+    result = re.sub(r'root-dir=(/[^\s,]+)', r'root-dir=[PATH REDACTED]', result)
+    result = re.sub(r'layer-dir=(/[^\s,]+)', r'layer-dir=[PATH REDACTED]', result)
+    result = re.sub(r'mount=([^\s,]+:[^\s,]+)', r'mount=[MOUNT REDACTED]', result)
+
+    # Mask image IDs and layer IDs (Docker internals)
+    result = re.sub(r'image-id="[^"]+"', r'image-id="[ID REDACTED]"', result)
+    result = re.sub(r'layers=([^\s,]+)', r'layers=[LAYERS REDACTED]', result)
 
     # Mask ONLY public IP addresses (not private ranges)
     # Private IP ranges to exclude:

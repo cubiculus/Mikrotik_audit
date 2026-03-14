@@ -57,6 +57,11 @@ reports-output/
 *.backup
 *.backup.gz
 *.backup.zip
+audit_report_*.txt
+audit_report_*.html
+audit_report_*.json
+audit_report_*.md
+*_audit_report.*
 
 # ------------------------------------------------------------
 # 💾 КЭШ И ВРЕМЕННЫЕ ФАЙЛЫ
@@ -233,6 +238,7 @@ dmypy.json
 .bandit
 .bandit.json
 .safety-policy.yml
+.secrets.baseline
 
 # ------------------------------------------------------------
 # 📦 DOCKER (если используется)

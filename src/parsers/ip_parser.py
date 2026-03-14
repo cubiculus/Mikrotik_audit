@@ -67,80 +67,97 @@ def _parse_ip_data_cached(line: str) -> dict:
 def _parse_ip_blocks(output: str) -> List[Dict[str, str]]:
     """
     Парсит вывод /ip address print detail в блоки с поддержкой комментариев.
-    
+
     Формат RouterOS 7:
-     1     ;;; Gateway for AdGuard container network
+     0     ;;; Gateway for AdGuard container network
            address=192.168.3.2/24 network=192.168.3.0 interface=AdGuard
-    
+
+     1     address=192.168.1.1/24 network=192.168.1.0 interface=bridge1
+
     Возвращает список словарей с данными IP-адресов включая комментарии.
     """
     addresses = []
     lines = output.split('\n')
     current_comment: Optional[str] = None
     current_data: Dict[str, str] = {}
-    
+    has_address = False
+
     i = 0
     while i < len(lines):
         line = lines[i].rstrip()
-        
+        stripped = line.strip()
+
         # Пропускаем пустые строки и заголовки
-        if not line.strip() or line.strip().startswith('Flags:'):
+        if not stripped or stripped.startswith('Flags:'):
             i += 1
             continue
-        
-        # Проверяем комментарий
-        comment_match = COMMENT_PATTERN.match(line.lstrip())
-        if comment_match:
-            current_comment = comment_match.group(1).strip()
+
+        # Проверяем комментарий (отдельная строка с ;;;)
+        if stripped.startswith(';;;'):
+            current_comment = stripped[3:].strip()
             i += 1
             continue
-        
-        # Проверяем начало новой записи (цифра в начале)
+
+        # Проверяем начало новой записи (цифра в начале строки)
         entry_match = ENTRY_START_PATTERN.match(line)
         if entry_match:
-            # Сохраняем предыдущую запись
-            if current_data:
-                if current_comment and 'comment' not in current_data:
+            # Сохраняем предыдущую запись если там был address
+            if has_address and current_data:
+                if current_comment:
                     current_data['comment'] = current_comment
                 addresses.append(current_data)
-            
+
             # Начинаем новую запись
             current_comment = None
             current_data = {}
-            
+            has_address = False
+
             # Парсим остаток строки после номера
             rest = entry_match.group(3) or ''
-            if rest and '=' in rest:
+
+            # Проверяем если комментарий в той же строке что и номер
+            if rest.startswith(';;;'):
+                current_comment = rest[3:].strip()
+                i += 1
+                continue
+
+            if rest and 'address=' in rest:
                 current_data = _parse_ip_data_cached(rest)
+                has_address = True
             i += 1
             continue
-        
+
         # Проверяем продолжение (строка с отступом и key=value)
-        if (line.startswith('  ') or line.startswith('\t')) and '=' in line:
+        if (line.startswith('      ') or line.startswith('\t')) and '=' in line:
             if current_data is not None:
                 data = _parse_ip_data_cached(line)
                 current_data.update(data)
+                if 'address' in data:
+                    has_address = True
             i += 1
             continue
-        
-        # Старый формат: просто ищем address= в строке
-        if 'address=' in line:
-            data = _parse_ip_data_cached(line)
-            if current_comment and 'comment' not in data:
-                data['comment'] = current_comment
-                current_comment = None
-            addresses.append(data)
+
+        # Строка с address= без большого отступа
+        if 'address=' in stripped:
+            if has_address and current_data:
+                if current_comment:
+                    current_data['comment'] = current_comment
+                addresses.append(current_data)
+
+            current_comment = None
+            current_data = _parse_ip_data_cached(stripped)
+            has_address = True
             i += 1
             continue
-        
+
         i += 1
-    
+
     # Сохраняем последнюю запись
-    if current_data:
-        if current_comment and 'comment' not in current_data:
+    if has_address and current_data:
+        if current_comment:
             current_data['comment'] = current_comment
         addresses.append(current_data)
-    
+
     return addresses
 
 
@@ -158,10 +175,10 @@ def parse_ip_address_results(ip_results: List) -> Tuple[List[IPAddress], Network
     for r in ip_results:
         if r.command.startswith('/ip address'):
             ip_output += r.stdout + '\n'
-    
+
     # Парсим блоки с поддержкой комментариев
     address_blocks = _parse_ip_blocks(ip_output)
-    
+
     for address_data in address_blocks:
         ip_addr = IPAddress()
         ip_addr.address = address_data.get('address', '')
