@@ -10,8 +10,10 @@ from src.models import Container, NetworkOverview
 logger = logging.getLogger(__name__)
 
 # Precompiled regular expressions
-CONTAINER_HEADER_PATTERN = re.compile(r"^\d+\s+([XDRSAI]+)")
-NEW_CONTAINER_PATTERN = re.compile(r"^\d+")
+# Match container header line: index followed by optional flags
+# Flags: X - stopped, D - disabled, R - running, S - seccomp, A - apparmor, I - iptables
+CONTAINER_HEADER_PATTERN = re.compile(r"^\s*(\d+)\s+([XDRSAI]*)\s*(.*)")
+NEW_CONTAINER_PATTERN = re.compile(r"^\s*\d+")
 INDENTED_PATTERN = re.compile(r"^\s{3,}")
 
 # Container field mapping
@@ -56,61 +58,68 @@ def parse_containers(results: List) -> Tuple[List[Container], NetworkOverview]:
     if not results or results[0].has_error:
         logger.warning("No container data available")
         return containers, overview
-    
-    lines = results[0].stdout.split(chr(10))
+
+    lines = results[0].stdout.split('\n')
     total_lines = len(lines)
     i = 0
-    
+
     while i < total_lines:
-        line = lines[i].strip()
-        
-        # Find container lines with flags
+        line = lines[i]
+
+        # Find container lines with index number
         header_match = CONTAINER_HEADER_PATTERN.match(line)
         if header_match:
-            flags = header_match.group(1)
-            status = "running" if 'R' in flags else "stopped"
+            # Check if this line has container parameters (name=, remote-image=, etc.)
+            rest_of_line = header_match.group(3).strip() if header_match.group(3) else ''
             
+            # Skip lines that don't have container data (just index with flags)
+            if not rest_of_line or '=' not in rest_of_line:
+                i += 1
+                continue
+
+            flags = header_match.group(2) or ''
+            status = "running" if 'R' in flags else "stopped"
+
             current_container = Container()
             current_container.status = status
-            
+
             logger.debug(f"Found container with flags: {flags}, status: {status}")
-            
+
             # Parse parameters from the same line (after flags)
-            rest_of_line = line[header_match.end():].strip()
             if '=' in rest_of_line:
                 for part in rest_of_line.split():
                     key, value = _parse_container_param_cached(part)
                     if key and value:
                         _set_container_field(current_container, key, value)
-            
+
             # Parse container parameters from following lines
             j = i + 1
             while j < total_lines:
                 next_line = lines[j].strip()
-                
-                # New container
-                if NEW_CONTAINER_PATTERN.match(next_line):
+
+                # New container (starts with number)
+                if NEW_CONTAINER_PATTERN.match(next_line) and '=' not in next_line:
                     break
-                
+
                 # Parse parameters (indented or containing =)
-                if INDENTED_PATTERN.match(lines[j]) or '=' in next_line:
+                if INDENTED_PATTERN.match(lines[j]) or ('=' in next_line and not NEW_CONTAINER_PATTERN.match(next_line)):
                     for part in next_line.split():
                         key, value = _parse_container_param_cached(part)
                         if key and value:
                             _set_container_field(current_container, key, value)
-                
+
                 j += 1
-            
+
             # Add container if it has a name
             if current_container.name:
                 containers.append(current_container)
                 logger.debug(f"Parsed container: {current_container.name} -> {current_container.status}")
-            
+
             i = j
         else:
             i += 1
-    
+
     overview.containers_total = len(containers)
     overview.containers_running = sum(1 for c in containers if c.status == "running")
-    
+
     return containers, overview

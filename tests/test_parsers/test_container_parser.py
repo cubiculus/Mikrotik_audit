@@ -62,7 +62,8 @@ class TestContainerParserHelpers:
         """Test setting invalid field does nothing."""
         container = Container()
         _set_container_field(container, "invalid_field", "value")
-        assert container.name is None
+        # Container.name has default value "" (empty string), not None
+        assert container.name == ""
 
     def test_set_container_field_image(self):
         """Test setting remote-image field."""

@@ -5,61 +5,9 @@ import re
 from typing import List, Optional
 
 from src.models import BridgePort, WireGuardPeer, PPPActive, ARPEntry
+from src.parsers.utils import parse_key_value_line
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_key_value_line(line: str) -> dict:
-    """Parse key=value or key: value line into dictionary."""
-    data = {}
-    i = 0
-    n = len(line)
-
-    while i < n:
-        # Skip whitespace
-        while i < n and line[i].isspace():
-            i += 1
-        if i >= n:
-            break
-
-        # Find key
-        key_start = i
-        while i < n and line[i] not in '=:':
-            i += 1
-
-        if i >= n:
-            break
-
-        key = line[key_start:i].strip().lower().replace('-', '_')
-
-        # Skip separator
-        i += 1
-
-        # Skip whitespace
-        while i < n and line[i].isspace():
-            i += 1
-        if i >= n:
-            break
-
-        # Find value
-        if line[i] == '"':
-            # Quoted value
-            value_start = i + 1
-            i = value_start
-            while i < n and line[i] != '"':
-                i += 1
-            value = line[value_start:i]
-            i += 1
-        else:
-            # Unquoted value
-            value_start = i
-            while i < n and not line[i].isspace():
-                i += 1
-            value = line[value_start:i]
-
-        data[key] = value
-
-    return data
 
 
 def parse_bridge_ports(results: List) -> List[BridgePort]:
@@ -99,13 +47,13 @@ def parse_bridge_ports(results: List) -> List[BridgePort]:
             rest = entry_match.group(3) or ''
 
             if '=' in rest:
-                current_port.update(_parse_key_value_line(rest))
+                current_port.update(parse_key_value_line(rest))
             continue
 
         # Продолжение с отступом
         if (line.startswith('  ') or line.startswith('\t')) and '=' in line:
             if current_port is not None:
-                current_port.update(_parse_key_value_line(line))
+                current_port.update(parse_key_value_line(line))
             continue
 
     # Сохраняем последний порт
@@ -182,13 +130,13 @@ def parse_wireguard_peers(results: List) -> List[WireGuardPeer]:
             rest = entry_match.group(3) or ''
 
             if '=' in rest:
-                current_peer.update(_parse_key_value_line(rest))
+                current_peer.update(parse_key_value_line(rest))
             continue
 
         # Продолжение с отступом
         if (line.startswith('  ') or line.startswith('\t')) and '=' in line:
             if current_peer is not None:
-                current_peer.update(_parse_key_value_line(line))
+                current_peer.update(parse_key_value_line(line))
             continue
 
     # Сохраняем последнего пира
@@ -279,13 +227,13 @@ def parse_ppp_active(results: List) -> List[PPPActive]:
             rest = entry_match.group(3) or ''
 
             if '=' in rest:
-                current_conn.update(_parse_key_value_line(rest))
+                current_conn.update(parse_key_value_line(rest))
             continue
 
         # Продолжение с отступом
         if (line.startswith('  ') or line.startswith('\t')) and '=' in line:
             if current_conn is not None:
-                current_conn.update(_parse_key_value_line(line))
+                current_conn.update(parse_key_value_line(line))
             continue
 
     # Сохраняем последнее соединение
@@ -377,13 +325,13 @@ def parse_arp(results: List) -> List[ARPEntry]:
             rest = entry_match.group(3) or ''
 
             if '=' in rest:
-                current_entry.update(_parse_key_value_line(rest))
+                current_entry.update(parse_key_value_line(rest))
             continue
 
         # Продолжение с отступом
         if (line.startswith('  ') or line.startswith('\t')) and '=' in line:
             if current_entry is not None:
-                current_entry.update(_parse_key_value_line(line))
+                current_entry.update(parse_key_value_line(line))
             continue
 
     # Сохраняем последнюю запись
