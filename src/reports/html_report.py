@@ -557,23 +557,22 @@ class HTMLReportGenerator(BaseReportGenerator):
             route_rows = []
 
             for idx, route in enumerate(overview.routes[:30]):  # Limit to 30 routes
-                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if route.disabled else ''
+                disabled_badge = '<span style="margin-left: 6px; color: #ef4444; font-size: 0.85em;">● disabled</span>' if route.disabled else ''
                 comment = route.comment or ""
 
                 route_rows.append(f'''
                     <tr class="{'disabled-rule' if route.disabled else ''}">
                         <td>{idx + 1}</td>
-                        <td>{route.dst_address or "-"}</td>
+                        <td>{route.dst_address or "-"}{disabled_badge}</td>
                         <td>{route.gateway or "-"}</td>
                         <td>{route.routing_mark or "-"}</td>
                         <td>{route.distance or "-"}</td>
                         <td>{comment[:30] + "..." if len(comment) > 30 else comment}</td>
-                        <td>{disabled_badge}</td>
                     </tr>
                 ''')
 
             more_rules = len(overview.routes) - 30
-            more_html = f'<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more routes</em></td></tr>' if more_rules > 0 else ''
+            more_html = f'<tr><td colspan="6" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more routes</em></td></tr>' if more_rules > 0 else ''
 
             content_parts.append(f'''
                 <div class="info-card" style="margin-bottom: 20px;">
@@ -588,7 +587,6 @@ class HTMLReportGenerator(BaseReportGenerator):
                                 <th>Routing Mark</th>
                                 <th>Distance</th>
                                 <th>Comment</th>
-                                <th>State</th>
                             </tr>
                         </thead>
                         <tbody>{''.join(route_rows)}{more_html}</tbody>

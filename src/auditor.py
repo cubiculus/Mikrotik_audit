@@ -153,8 +153,16 @@ class MikroTikAuditor:
             'normal': normal
         }
 
-    def _execute_command_group(self, commands: List[str], max_workers: int, start_idx: int, total: int):
-        """Execute a group of commands."""
+    def _execute_command_group(self, commands: List[str], max_workers: int, start_idx: int, total: int, phase_desc: str = ""):
+        """Execute a group of commands.
+
+        Args:
+            commands: List of commands to execute
+            max_workers: Maximum number of worker threads
+            start_idx: Starting index for command numbering
+            total: Total number of commands
+            phase_desc: Description of the phase for progress bar
+        """
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(self.execute_command, start_idx + i, cmd): (start_idx + i, cmd)
@@ -163,7 +171,8 @@ class MikroTikAuditor:
 
             # Use tqdm for progress bar if enabled
             if self.config.show_progress_bar:
-                with tqdm(total=len(futures), desc="Executing commands", unit="cmd") as pbar:
+                desc = f"{phase_desc}" if phase_desc else "Executing commands"
+                with tqdm(total=len(futures), desc=desc, unit="cmd", leave=False) as pbar:
                     for future in as_completed(futures):
                         index, cmd = futures[future]
                         try:
@@ -287,57 +296,35 @@ class MikroTikAuditor:
         # Phase 1: Fast commands
         if grouped['fast']:
             if self.config.show_progress_bar:
-                with tqdm(total=len(grouped['fast']), desc="Phase 1: Fast commands", unit="cmd", leave=False) as pbar:
-                    self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total)
-            else:
                 logger.info(f"\n{Fore.YELLOW}▶ Phase 1: Fast commands ({len(grouped['fast'])})...{Style.RESET_ALL}\n")
-                self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total)
+            self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total, "Phase 1: Fast")
 
         # Phase 2: Heavy commands
         if grouped['heavy']:
             if self.config.show_progress_bar:
-                with tqdm(total=len(grouped['heavy']), desc="Phase 2: Heavy commands", unit="cmd", leave=False) as pbar:
-                    self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), len(grouped['fast']) + 1, total)
-            else:
                 logger.info(f"\n{Fore.YELLOW}▶ Phase 2: Heavy commands ({len(grouped['heavy'])})...{Style.RESET_ALL}\n")
-                start_idx = len(grouped['fast']) + 1
-                self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), start_idx, total)
+            start_idx = len(grouped['fast']) + 1
+            self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), start_idx, total, "Phase 2: Heavy")
 
         # Phase 3: Normal commands
         if grouped['normal']:
             if self.config.show_progress_bar:
-                with tqdm(total=len(grouped['normal']), desc="Phase 3: Normal commands", unit="cmd", leave=False) as pbar:
-                    start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
-                    self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total)
-            else:
                 logger.info(f"\n{Fore.YELLOW}▶ Phase 3: Normal commands ({len(grouped['normal'])})...{Style.RESET_ALL}\n")
-                start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
-                self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total)
+            start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
+            self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total, "Phase 3: Normal")
 
         # Phase 4: Dependent commands (sequential)
         if grouped['dependent']:
             if self.config.show_progress_bar:
-                with tqdm(total=len(grouped['dependent']), desc="Phase 4: Dependent commands", unit="cmd", leave=False) as pbar:
-                    start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
-                    for cmd in grouped['dependent']:
-                        result = self.execute_command(start_idx, cmd)
-                        self.results.append(result)
-                        status = "✓" if not result.has_error else "✗"
-                        pbar.set_postfix_str(f"{status} {cmd[:40]}{'...' if len(cmd) > 40 else ''}")
-                        pbar.update(1)
-                        start_idx += 1
-            else:
                 logger.info(f"\n{Fore.YELLOW}▶ Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
-                start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
-                for cmd in grouped['dependent']:
-                    result = self.execute_command(start_idx, cmd)
-                    self.results.append(result)
-                    status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
-                    logger.info(
-                        f"[{Fore.CYAN}{start_idx}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
-                        f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
-                    )
-                    start_idx += 1
+            start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
+            for cmd in grouped['dependent']:
+                result = self.execute_command(start_idx, cmd)
+                self.results.append(result)
+                if self.config.show_progress_bar:
+                    status = "✓" if not result.has_error else "✗"
+                    print(f"  {status} {cmd[:50]}{'...' if len(cmd) > 50 else ''}")
+                start_idx += 1
 
     def _analyze_security(self) -> List[SecurityIssue]:
         """Analyze security and return issues."""
