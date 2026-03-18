@@ -571,10 +571,5 @@ def diff(report1: str, report2: str, output: Optional[str]):
         sys.exit(1)
 
 
-def main():  # noqa: F811
-    """Entry point for backward compatibility."""
-    cli()
-
-
 if __name__ == '__main__':
     cli()

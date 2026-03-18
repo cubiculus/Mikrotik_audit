@@ -76,7 +76,7 @@ def parse_ip_service(results: List) -> List[Service]:
     Примечание: Вывод может содержать активные подключения (с флагом 'c' и полями local=/remote=),
     которые не являются отдельными сервисами и должны быть пропущены.
     """
-    services = []
+    services: list[dict] = []
     seen_services = set()  # Для предотвращения дубликатов
 
     if not results or results[0].has_error:
@@ -156,7 +156,7 @@ def parse_ssh_sessions(results: List) -> List[SSHSession]:
     Формат вывода RouterOS:
      dynamic-connection: 0  user=admin remote=192.168.1.100:54321 connected-since=2h30m
     """
-    sessions = []
+    sessions: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No SSH session data available")
@@ -208,7 +208,7 @@ def parse_users(results: List) -> List[User]:
         address=0.0.0.0/0 netmask=0.0.0.0
         last-logged-in=2026-03-14 17:40:13
     """
-    users = []
+    users: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No user data available")
@@ -282,7 +282,7 @@ def parse_certificates(results: List) -> List[Certificate]:
         key-type=rsa
         key-size=2048
     """
-    certificates = []
+    certificates: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No certificate data available")
@@ -365,7 +365,7 @@ def parse_scripts(results: List) -> List[Script]:
         last-modified=Jan/01/2024 12:00:00
         source=/log info "Hello"
     """
-    scripts = []
+    scripts: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No script data available")
@@ -438,7 +438,7 @@ def parse_scheduler(results: List) -> List[Scheduler]:
         next-run=mar/15/2026 10:00:00 on-event=script1
         disabled=no
     """
-    schedulers = []
+    schedulers: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No scheduler data available")

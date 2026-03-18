@@ -35,7 +35,7 @@ def _parse_size_to_bytes(value: int, unit: str) -> int:
 def parse_system_resource(results: List) -> SystemResource:
     """
     Parse system resource information from /system resource print.
-    
+
     Формат вывода RouterOS:
      uptime: 5d12h30m
      version: 7.22 (stable)
@@ -54,23 +54,23 @@ def parse_system_resource(results: List) -> SystemResource:
      bad-blocks-percent: 0%
      factory-firmware: 7.12
      current-firmware: 7.22
-     upgrade-firmware: 
+     upgrade-firmware:
      platform: hAP ax^3
      serial-number: ABCD1234
     """
     resource = SystemResource()
-    
+
     if not results or results[0].has_error:
         logger.warning("No system resource data available")
         return resource
-    
+
     output = results[0].stdout
-    
+
     for line in output.split('\n'):
         line = line.strip()
         if not line:
             continue
-        
+
         # Парсинг key: value или key=value
         if ':' in line:
             parts = line.split(':', 1)
@@ -88,7 +88,7 @@ def parse_system_resource(results: List) -> SystemResource:
                 continue
         else:
             continue
-        
+
         # Обработка конкретных полей
         if key == 'uptime':
             resource.uptime = value
@@ -153,14 +153,14 @@ def parse_system_resource(results: List) -> SystemResource:
         elif key == 'heap_size' or key == 'heap-size':
             val, unit = _parse_value_with_unit(value)
             resource.heap_size = _parse_size_to_bytes(val, unit)
-    
+
     return resource
 
 
 def parse_system_health(results: List) -> SystemHealth:
     """
     Parse system health information from /system health print.
-    
+
     Формат вывода RouterOS:
      temperature: 45C
      voltage: 12V
@@ -172,18 +172,18 @@ def parse_system_health(results: List) -> SystemHealth:
      poe-out-current: 150mA
     """
     health = SystemHealth()
-    
+
     if not results or results[0].has_error:
         logger.warning("No system health data available")
         return health
-    
+
     output = results[0].stdout
-    
+
     for line in output.split('\n'):
         line = line.strip()
         if not line:
             continue
-        
+
         # Парсинг key: value или key=value
         if ':' in line:
             parts = line.split(':', 1)
@@ -201,7 +201,7 @@ def parse_system_health(results: List) -> SystemHealth:
                 continue
         else:
             continue
-        
+
         # Обработка конкретных полей
         if key == 'temperature':
             health.temperature = value
@@ -231,46 +231,45 @@ def parse_system_health(results: List) -> SystemHealth:
             health.board_temperature2 = value
         elif key == 'junction_temperature' or key == 'junction-temperature':
             health.junction_temperature = value
-    
+
     return health
 
 
 def parse_system_package(results: List) -> List:
     """
     Parse system package information from /system package print.
-    
+
     Возвращает список словарей с информацией о пакетах.
     """
-    from src.models import Package
-    
-    packages = []
-    
+
+    packages: list[dict] = []
+
     if not results or results[0].has_error:
         logger.warning("No system package data available")
         return packages
-    
+
     output = results[0].stdout
-    
+
     # Парсинг многострочного формата
     current_package: Optional[dict] = None
     lines = output.split('\n')
-    
+
     for line in lines:
         line = line.rstrip()
         if not line or line.strip().startswith('Flags:'):
             continue
-        
+
         # Проверяем начало новой записи (цифра в начале)
         entry_match = re.match(r'^\s*(\d+)\s+(?:([A-Z*]+)\s+)?(.*)$', line)
         if entry_match:
             # Сохраняем предыдущий пакет
             if current_package:
                 packages.append(current_package)
-            
+
             # Начинаем новый пакет
             current_package = {}
             rest = entry_match.group(3) or ''
-            
+
             # Парсим rest если там есть данные
             if '=' in rest:
                 for part in rest.split():
@@ -278,7 +277,7 @@ def parse_system_package(results: List) -> List:
                         k, v = part.split('=', 1)
                         current_package[k] = v
             continue
-        
+
         # Продолжение с отступом
         if (line.startswith('  ') or line.startswith('\t')) and '=' in line:
             if current_package is not None:
@@ -287,18 +286,18 @@ def parse_system_package(results: List) -> List:
                         k, v = part.split('=', 1)
                         current_package[k] = v
             continue
-    
+
     # Сохраняем последний пакет
     if current_package:
         packages.append(current_package)
-    
+
     return packages
 
 
 def parse_system_package_update(results: List) -> dict:
     """
     Parse system package update information from /system package update print.
-    
+
     Возвращает словарь с информацией об обновлениях.
     """
     update_info = {
@@ -308,24 +307,24 @@ def parse_system_package_update(results: List) -> dict:
         'channel': '',
         'scheduled': False,
     }
-    
+
     if not results or results[0].has_error:
         logger.warning("No system package update data available")
         return update_info
-    
+
     output = results[0].stdout
-    
+
     for line in output.split('\n'):
         line = line.strip()
         if not line:
             continue
-        
+
         if ':' in line:
             parts = line.split(':', 1)
             if len(parts) == 2:
                 key = parts[0].strip().lower().replace('-', '_')
                 value = parts[1].strip()
-                
+
                 if key == 'installed_version' or key == 'installed-version':
                     update_info['installed_version'] = value
                 elif key == 'latest_version' or key == 'latest-version':
@@ -340,7 +339,7 @@ def parse_system_package_update(results: List) -> dict:
             if len(parts) == 2:
                 key = parts[0].strip().lower().replace('-', '_')
                 value = parts[1].strip()
-                
+
                 if key == 'installed_version' or key == 'installed-version':
                     update_info['installed_version'] = value
                 elif key == 'latest_version' or key == 'latest-version':
@@ -350,5 +349,5 @@ def parse_system_package_update(results: List) -> dict:
                     update_info['channel'] = value
                 elif key == 'scheduled':
                     update_info['scheduled'] = value.lower() == 'true' or value.lower() == 'yes'
-    
+
     return update_info

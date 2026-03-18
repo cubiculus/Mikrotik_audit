@@ -70,7 +70,7 @@ def parse_bridge_ports(results: List) -> List[BridgePort]:
      0  bridge=bridge1 port=ether1 priority=128 path-cost=100
         edge=yes p2p=yes learning=yes hw=yes
     """
-    ports = []
+    ports: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No bridge port data available")
@@ -153,7 +153,7 @@ def parse_wireguard_peers(results: List) -> List[WireGuardPeer]:
         last-handshake=5m ago
         tx-bytes=123456 rx-bytes=789012
     """
-    peers = []
+    peers: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No WireGuard peer data available")
@@ -250,7 +250,7 @@ def parse_ppp_active(results: List) -> List[PPPActive]:
         uptime=2h30m rate-tx=1000000 rate-rx=2000000
         total-tx=123456789 total-rx=987654321
     """
-    connections = []
+    connections: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No PPP active data available")
@@ -343,7 +343,7 @@ def parse_arp(results: List) -> List[ARPEntry]:
      0  address=192.168.1.100 mac-address=AA:BB:CC:DD:EE:FF
         interface=ether1 status=completed dynamic=yes
     """
-    entries = []
+    entries: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No ARP data available")

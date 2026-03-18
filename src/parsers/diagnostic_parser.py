@@ -73,7 +73,7 @@ def parse_logs(results: List, count: int = 50) -> List[LogEntry]:
     Или detail формат:
      0  time=12:30:45 topics=system,info,account message="user admin logged in"
     """
-    entries = []
+    entries: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No log data available")
@@ -133,7 +133,7 @@ def parse_firewall_logs(results: List) -> List[LogEntry]:
 
     Специализированный парсер для логов firewall.
     """
-    entries = []
+    entries: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No firewall log data available")
@@ -183,7 +183,7 @@ def parse_history(results: List) -> List[HistoryEntry]:
     Или detail формат:
      0  time=12:30:45 action=add cmd="/ip address add address=192.168.1.1/24" by=admin
     """
-    entries = []
+    entries: list[dict] = []
 
     if not results or results[0].has_error:
         logger.warning("No history data available")
@@ -255,7 +255,7 @@ def parse_ping_results(results: List) -> dict:
        2 8.8.8.8 56 116 2ms
        sent=3 received=3 lost=0 avg-rtt=2ms
     """
-    ping_result = {
+    ping_result: dict = {
         'target': '',
         'sent': 0,
         'received': 0,
