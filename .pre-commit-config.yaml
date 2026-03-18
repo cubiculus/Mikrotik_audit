@@ -70,6 +70,15 @@ repos:
         args: [-c, .bandit.yml, -ll]
         exclude: ^tests/
 
+  # ───────────────── Python type checking ────────────────────────────────────
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Mypy type checker
+        args: [--config-file=mypy.ini]
+        exclude: ^tests/
+
   # ───────────────── Python code style ───────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.3.0
