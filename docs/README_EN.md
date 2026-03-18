@@ -92,13 +92,19 @@ pip install -r requirements.txt
 
 **Windows:**
 ```powershell
-scripts\run_audit.bat --ssh-user admin --ssh-pass your_password
+# Set environment variable before running
+$env:MIKROTIK_PASSWORD="your_password"
+scripts\run_audit.bat --ssh-user admin
 ```
 
 **Linux/Mac:**
 ```bash
-./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
+# Set environment variable before running
+export MIKROTIK_PASSWORD="your_password"
+./scripts/run_audit.sh --ssh-user admin
 ```
+
+> **Note:** `MIKROTIK_PASSWORD` environment variable is required, or use SSH key authentication.
 
 ### 2. Configuration
 
@@ -117,16 +123,21 @@ cp .env.example .env
 
 ```bash
 # Basic audit
-python mikrotik_audit.py
+python -m src.cli
 
 # Full audit
-python mikrotik_audit.py --audit-level Comprehensive
+python -m src.cli --audit-level Comprehensive
 
 # With parameters
-python mikrotik_audit.py \
+python -m src.cli \
     --router-ip 192.168.88.1 \
     --ssh-user admin \
     --output-dir ./reports
+
+# Using environment variables
+$env:MIKROTIK_PASSWORD="your_password"  # PowerShell
+export MIKROTIK_PASSWORD="your_password"  # Bash
+python -m src.cli --ssh-user admin
 ```
 
 ---
@@ -268,7 +279,6 @@ Mikrotik_audit/
 | `--router-ip` | Router IP address or hostname | Yes | Auto-detect |
 | `--ssh-port` | SSH port | No | 22 |
 | `--ssh-user` | SSH username | Yes | - |
-| `--ssh-pass` | SSH password | Yes* | - |
 | `--ssh-key-file` | Path to SSH private key file | No* | - |
 | `--ssh-key-passphrase` | Passphrase for SSH key | No | - |
 | `--audit-level` | Audit level: Basic, Standard, Comprehensive | No | Standard |
@@ -276,13 +286,20 @@ Mikrotik_audit/
 | `--skip-security` | Skip security analysis | No | False |
 | `--max-workers` | Maximum parallel threads | No | 0 (auto) |
 | `--redact` | Redact sensitive data from reports | No | False |
+| `--connect-timeout` | SSH connection timeout (seconds) | No | 30 |
+| `--command-timeout` | Command execution timeout (seconds) | No | 120 |
+| `--no-backup` | Skip system backup | No | False |
+| `--verbose` | Enable verbose logging (DEBUG level) | No | False |
+| `--quiet` | Quiet mode (WARNING level only) | No | False |
 
-\* Either `--ssh-pass` or `--ssh-key-file` must be provided.
+\* Either `MIKROTIK_PASSWORD` or `--ssh-key-file` must be provided.
 
 **Environment Variables:**
 - `MIKROTIK_PASSWORD` - SSH password
 - `MIKROTIK_SSH_KEY_FILE` - SSH key file path
 - `MIKROTIK_SSH_KEY_PASSPHRASE` - SSH key passphrase
+- `MIKROTIK_CONNECT_TIMEOUT` - SSH connection timeout (seconds)
+- `MIKROTIK_COMMAND_TIMEOUT` - Command execution timeout (seconds)
 
 ---
 

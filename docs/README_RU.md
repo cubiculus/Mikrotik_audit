@@ -92,13 +92,19 @@ pip install -r requirements.txt
 
 **Windows:**
 ```powershell
-scripts\run_audit.bat --ssh-user admin --ssh-pass your_password
+# Установите переменную окружения перед запуском
+$env:MIKROTIK_PASSWORD="your_password"
+scripts\run_audit.bat --ssh-user admin
 ```
 
 **Linux/Mac:**
 ```bash
-./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
+# Установите переменную окружения перед запуском
+export MIKROTIK_PASSWORD="your_password"
+./scripts/run_audit.sh --ssh-user admin
 ```
+
+> **Примечание:** Требуется установить `MIKROTIK_PASSWORD` или использовать SSH-ключ.
 
 ### 2. Настройка
 
@@ -117,16 +123,21 @@ cp .env.example .env
 
 ```bash
 # Базовый аудит
-python mikrotik_audit.py
+python -m src.cli
 
 # Полный аудит
-python mikrotik_audit.py --audit-level Comprehensive
+python -m src.cli --audit-level Comprehensive
 
 # С указанием параметров
-python mikrotik_audit.py \
+python -m src.cli \
     --router-ip 192.168.88.1 \
     --ssh-user admin \
     --output-dir ./reports
+
+# С использованием переменных окружения
+$env:MIKROTIK_PASSWORD="your_password"  # PowerShell
+export MIKROTIK_PASSWORD="your_password"  # Bash
+python -m src.cli --ssh-user admin
 ```
 
 ---
@@ -267,7 +278,6 @@ Mikrotik_audit/
 | `--router-ip` | IP адрес или hostname роутера | Да | Авто-определение |
 | `--ssh-port` | SSH порт | Нет | 22 |
 | `--ssh-user` | SSH пользователь | Да | - |
-| `--ssh-pass` | SSH пароль | Да* | - |
 | `--ssh-key-file` | Путь к файлу приватного SSH ключа | Нет* | - |
 | `--ssh-key-passphrase` | Парольная фраза для SSH ключа | Нет | - |
 | `--audit-level` | Уровень аудита: Basic, Standard, Comprehensive | Нет | Standard |
@@ -275,13 +285,20 @@ Mikrotik_audit/
 | `--skip-security` | Пропустить анализ безопасности | Нет | False |
 | `--max-workers` | Максимум параллельных потоков | Нет | 0 (авто) |
 | `--redact` | Скрыть чувствительные данные в отчётах | Нет | False |
+| `--connect-timeout` | Таймаут подключения (сек) | Нет | 30 |
+| `--command-timeout` | Таймаут команды (сек) | Нет | 120 |
+| `--no-backup` | Пропустить создание бэкапа | Нет | False |
+| `--verbose` | Включить подробное логирование (DEBUG) | Нет | False |
+| `--quiet` | Тихий режим (только WARNING) | Нет | False |
 
-\* Необходимо указать либо `--ssh-pass`, либо `--ssh-key-file`.
+\* Требуется указать либо `MIKROTIK_PASSWORD`, либо `--ssh-key-file`.
 
 **Переменные окружения:**
 - `MIKROTIK_PASSWORD` - SSH пароль
 - `MIKROTIK_SSH_KEY_FILE` - Путь к SSH ключу
 - `MIKROTIK_SSH_KEY_PASSPHRASE` - Парольная фраза SSH ключа
+- `MIKROTIK_CONNECT_TIMEOUT` - Таймаут подключения (сек)
+- `MIKROTIK_COMMAND_TIMEOUT` - Таймаут команды (сек)
 
 ---
 
