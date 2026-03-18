@@ -196,3 +196,49 @@ class ReportGenerator:
             backup_result=backup_result,
             network_overview=network_overview
         )
+
+    def generate_all_reports(
+        self,
+        results: List[CommandResult],
+        security_issues: List[SecurityIssue],
+        router_info: RouterInfo,
+        backup_result: Optional[BackupResult] = None,
+        network_overview: Optional[NetworkOverview] = None,
+        formats: Optional[List[str]] = None
+    ) -> dict:
+        """Generate reports in all specified formats.
+
+        Args:
+            results: Command execution results
+            security_issues: Security issues found
+            router_info: Router information
+            backup_result: Backup operation result
+            network_overview: Pre-parsed network overview (optional)
+            formats: List of formats to generate. If None, generates all (html,json,txt,md)
+
+        Returns:
+            Dictionary mapping format names to generated file paths
+        """
+        if formats is None:
+            formats = ['html', 'json', 'txt', 'md']
+
+        generated_reports = {}
+
+        if 'html' in formats:
+            generated_reports['html'] = self.generate_html_report(
+                results, security_issues, router_info, backup_result, network_overview
+            )
+        if 'json' in formats:
+            generated_reports['json'] = self.generate_json_report(
+                results, security_issues, router_info, backup_result, network_overview
+            )
+        if 'txt' in formats:
+            generated_reports['txt'] = self.generate_txt_report(
+                results, security_issues, router_info, backup_result, network_overview
+            )
+        if 'md' in formats:
+            generated_reports['md'] = self.generate_markdown_report(
+                results, security_issues, router_info, backup_result, network_overview
+            )
+
+        return generated_reports

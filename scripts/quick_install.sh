@@ -78,12 +78,18 @@ echo
 echo "Installation directory: ${YELLOW}$INSTALL_DIR${NC}"
 echo
 echo "To run the audit tool:"
-echo "  cd $INSTALL_DIR"
-echo "  source venv/bin/activate"
-echo "  python -m src.cli --ssh-user admin --ssh-pass your_password"
+echo "  1. Configure credentials in .env file:"
+echo "     cd $INSTALL_DIR"
+echo "     cp .env.example .env"
+echo "     # Edit .env with your settings"
+echo "  2. Run the audit:"
+echo "     cd $INSTALL_DIR"
+echo "     source venv/bin/activate"
+echo "     python -m src.cli --ssh-user admin"
+echo "     # Password will be prompted interactively"
 echo
 echo "Or use the quick command:"
-echo "  $INSTALL_DIR/scripts/run_audit.sh --ssh-user admin --ssh-pass your_password"
+echo "  $INSTALL_DIR/scripts/run_audit.sh --ssh-user admin"
 echo
 echo -e "For more information: ${YELLOW}https://github.com/cubiculus/Mikrotik_audit${NC}"
 echo "========================================"

@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader
 from src.config import CommandResult, SecurityIssue, RouterInfo, BackupResult
 from src.models import NetworkOverview
 from src.reports.base_report import BaseReportGenerator
+from src.security_analyzer import SecurityAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,9 @@ class HTMLReportGenerator(BaseReportGenerator):
             # Render template с autoescape
             report_datetime = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
+            # Calculate security score
+            security_score = SecurityAnalyzer.calculate_security_score(security_issues)
+
             html = self.template.render(
                 router_identity=router_info.identity or "Unknown",
                 router_model=router_info.model or "Unknown",
@@ -94,6 +98,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 failed_commands=failed_commands,
                 success_rate=success_rate,
                 security_issues_count=len(security_issues),
+                security_score=security_score,
                 charts_html=charts_html,
                 backup_section=backup_section,
                 security_section=security_section,
@@ -295,7 +300,7 @@ class HTMLReportGenerator(BaseReportGenerator):
             html += "</p></div>"
             return html
         elif backup_result.status == "skipped":
-            # Определяем понятное сообщение о причине пропуска
+            # Determine clear message based on reason
             reason = backup_result.error_message or "Not required"
             detailed_reason = ""
             icon = "⚠️"
@@ -303,37 +308,37 @@ class HTMLReportGenerator(BaseReportGenerator):
             if "permission" in reason.lower() or "write" in reason.lower():
                 detailed_reason = """
                     <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
-                        <strong>📝 Причина:</strong> У пользователя нет прав на запись (требуется 'write' или 'full')<br>
-                        <strong>🔧 Решение:</strong> Создайте пользователя с правами 'write' или 'full' для создания резервных копий<br>
-                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                        <strong>📝 Reason:</strong> User lacks write permissions (requires 'write' or 'full')<br>
+                        <strong>🔧 Solution:</strong> Create a user with 'write' or 'full' privileges for backup creation<br>
+                        <strong>ℹ️ Note:</strong> Security audit and data collection completed successfully
                     </div>
                 """
                 icon = "🔒"
-            elif "sftp" in reason.lower() or "не поддерживается" in reason.lower():
-                # Извлекаем имя файла бэкапа если есть
+            elif "sftp" in reason.lower() or "not supported" in reason.lower():
+                # Extract backup filename if available
                 backup_filename = backup_result.file_name or "audit_backup_*.backup"
                 detailed_reason = f"""
                     <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
-                        <strong>📝 Причина:</strong> SFTP не поддерживается на этом роутере<br>
-                        <strong>✅ Статус:</strong> Бэкап создан, но не может быть скачан автоматически<br>
-                        <strong>🔧 Решение:</strong> Подключитесь через WinBox или Terminal и скачайте файл вручную:<br>
+                        <strong>📝 Reason:</strong> SFTP is not supported on this router<br>
+                        <strong>✅ Status:</strong> Backup created but cannot be downloaded automatically<br>
+                        <strong>🔧 Solution:</strong> Connect via WinBox or Terminal and download manually:<br>
                         <code style='background:#f0f0f0;padding:4px 8px;border-radius:3px;display:inline-block;margin-top:5px'>/file print detail where name="{backup_filename}"</code><br>
-                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                        <strong>ℹ️ Note:</strong> Security audit and data collection completed successfully
                     </div>
                 """
                 icon = "📁"
             elif "not required" in reason.lower() or "not needed" in reason.lower():
                 detailed_reason = """
                     <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
-                        <strong>📝 Причина:</strong> Резервное копирование не было запрошено<br>
-                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                        <strong>📝 Reason:</strong> Backup was not requested<br>
+                        <strong>ℹ️ Note:</strong> Security audit and data collection completed successfully
                     </div>
                 """
             else:
                 detailed_reason = f"""
                     <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
-                        <strong>📝 Причина:</strong> {reason}<br>
-                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                        <strong>📝 Reason:</strong> {reason}<br>
+                        <strong>ℹ️ Note:</strong> Security audit and data collection completed successfully
                     </div>
                 """
 
@@ -347,39 +352,39 @@ class HTMLReportGenerator(BaseReportGenerator):
             html += "</div>"
             return html
         else:
-            # Определяем тип ошибки и формируем понятное сообщение
+            # Determine error type and format clear message
             error_msg = backup_result.error_message or "Unknown error"
             icon = "❌"
             title = "Backup Failed"
 
-            # Извлекаем краткую причину из сообщения
+            # Extract short reason from message
             short_reason = ""
             recommendation = ""
 
             if "permission" in error_msg.lower() or "not enough permissions" in error_msg.lower():
-                short_reason = "Недостаточно прав для создания бэкапа"
-                recommendation = "Требуется пользователь с правами 'write' или 'full'"
+                short_reason = "Insufficient permissions to create backup"
+                recommendation = "User with 'write' or 'full' privileges required"
                 icon = "🔒"
             elif "sftp" in error_msg.lower() or "not supported" in error_msg.lower():
-                short_reason = "SFTP не поддерживается на роутере"
-                recommendation = "Скачайте бэкап вручную через WinBox"
+                short_reason = "SFTP is not supported on this router"
+                recommendation = "Download backup manually via WinBox"
                 icon = "📁"
             elif "exit status" in error_msg.lower() or "not found" in error_msg.lower():
-                short_reason = "Бэкап не был создан (ошибка RouterOS)"
-                recommendation = "Проверьте права доступа и место на диске"
+                short_reason = "Backup was not created (RouterOS error)"
+                recommendation = "Check access permissions and disk space"
                 icon = "⚠️"
             else:
-                short_reason = error_msg[:150]  # Обрезаем длинные сообщения
+                short_reason = error_msg[:150]  # Truncate long messages
 
             html = "<div style='background:#fee2e2;padding:20px;border-radius:8px;border-left:4px solid #ef4444'>"
             html += f"<h3 style='margin:0;color:#991b1b'>{icon} {title}</h3>"
             html += "<p style='margin:5px 0;color:#991b1b'>"
             html += f"<strong>Timestamp:</strong> {backup_result.timestamp}<br>"
-            html += f"<strong>Причина:</strong> {short_reason}"
+            html += f"<strong>Reason:</strong> {short_reason}"
             if recommendation:
-                html += f"<br><strong>Рекомендация:</strong> {recommendation}"
+                html += f"<br><strong>Recommendation:</strong> {recommendation}"
             html += "</p>"
-            html += "<p style='margin-top:10px;font-size:0.9em;color:#666'><em>ⓘ Аудит безопасности выполнен успешно</em></p>"
+            html += "<p style='margin-top:10px;font-size:0.9em;color:#666'><em>ℹ Security audit completed successfully</em></p>"
             html += "</div>"
             return html
 

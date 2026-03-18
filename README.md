@@ -62,6 +62,9 @@ python -m src.cli --ssh-user admin --ssh-key-file ~/.ssh/id_rsa
 
 # Run audit with redaction (hide sensitive data)
 set MIKROTIK_PASSWORD=your_password && python -m src.cli --ssh-user admin --redact
+
+# Generate all report formats (html, json, txt, md)
+set MIKROTIK_PASSWORD=your_password && python -m src.cli --ssh-user admin --all-formats
 ```
 
 ### 🎯 Quick Run
@@ -132,11 +135,13 @@ Mikrotik_audit/
 | `--skip-security` | Skip security analysis | No | False |
 | `--max-workers` | Maximum parallel workers | No | 0 (auto) |
 | `--redact` | Redact sensitive data from reports | No | False |
+| `--all-formats` | Generate all report formats (html,json,txt,md) | No | False |
 | `--connect-timeout` | SSH connection timeout in seconds | No | 30 |
 | `--command-timeout` | Command execution timeout in seconds | No | 120 |
 | `--no-backup` | Skip system backup | No | False |
 | `--verbose` | Enable verbose logging (DEBUG level) | No | False |
 | `--quiet` | Suppress non-essential output | No | False |
+| `--no-cve-check` | Disable CVE check for RouterOS version | No | False |
 
 \* Either `MIKROTIK_PASSWORD` environment variable or `--ssh-key-file` must be provided.
 
@@ -150,6 +155,7 @@ Mikrotik_audit/
 ## 🔑 Features
 
 - **Security Analysis** — automatic detection of security issues
+- **CVE Vulnerability Check** — check RouterOS version against known CVE database (CVE-2018-14847, CVE-2021-42069, etc.)
 - **Multiple Report Formats** — HTML, JSON, TXT, Markdown
 - **SSH Key Authentication** — support for private key authentication
 - **Sensitive Data Redaction** — mask passwords, serial numbers, IP addresses

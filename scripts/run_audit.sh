@@ -1,6 +1,7 @@
 #!/bin/bash
 # Quick run script for MikroTik Audit Tool (Linux/Mac)
-# Usage: ./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
+# Usage: ./scripts/run_audit.sh --ssh-user admin
+# Note: Configure password in .env file or enter interactively
 
 # Change to the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

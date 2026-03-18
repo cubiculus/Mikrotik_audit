@@ -35,7 +35,7 @@ class JSONReportGenerator(BaseReportGenerator):
             report_data = {
                 "metadata": {
                     "timestamp": self.timestamp,
-                    "router": router_info.dict(),
+                    "router": router_info.model_dump(),
                 },
                 "summary": {
                     "total_commands": len(results),
@@ -51,11 +51,11 @@ class JSONReportGenerator(BaseReportGenerator):
                     "system_version": network_overview.system_version,
                     "containers": [
                         {
-                            "name": c.name,
-                            "status": c.status,
-                            "interface": c.interface,
-                            "image": c.image,
-                            "root_directory": c.root_directory,
+                            "name": c.get("name", "") if isinstance(c, dict) else c.name,
+                            "status": c.get("status", "") if isinstance(c, dict) else c.status,
+                            "interface": c.get("interface", "") if isinstance(c, dict) else c.interface,
+                            "image": c.get("image", "") if isinstance(c, dict) else c.image,
+                            "root_directory": c.get("root_directory", "") if isinstance(c, dict) else c.root_directory,
                         }
                         for c in network_overview.containers
                     ],
@@ -65,7 +65,7 @@ class JSONReportGenerator(BaseReportGenerator):
                         "use_doh": network_overview.dns.use_doh if network_overview.dns else False,
                         "doh_server": network_overview.dns.doh_server if network_overview.dns else "",
                         "cache_size": network_overview.dns.cache_size if network_overview.dns else 0,
-                        "static_entries_count": len(network_overview.dns.static_entries) if network_overview.dns else 0,
+                        "static_entries_count": len(network_overview.dns.static_entries) if network_overview.dns and network_overview.dns.static_entries else 0,
                     },
                     "mangle_rules": [
                         {
@@ -83,10 +83,12 @@ class JSONReportGenerator(BaseReportGenerator):
                     ],
                     "routing_rules": [
                         {
-                            "src_address": r.src_address,
-                            "routing_mark": r.routing_mark,
-                            "table": r.table,
-                            "comment": r.comment,
+                            "src_address": r.get("src-address", ""),
+                            "dst_address": r.get("dst-address", ""),
+                            "routing_mark": r.get("routing-mark", ""),
+                            "action": r.get("action", ""),
+                            "comment": r.get("comment", ""),
+                            "disabled": r.get("disabled", "false") == "true",
                         }
                         for r in network_overview.routing_rules
                     ],
@@ -95,7 +97,9 @@ class JSONReportGenerator(BaseReportGenerator):
                             "dst_address": r.dst_address,
                             "gateway": r.gateway,
                             "routing_mark": r.routing_mark,
-                            "active": r.active,
+                            "disabled": r.disabled,
+                            "distance": r.distance,
+                            "comment": r.comment,
                         }
                         for r in network_overview.routes if r.routing_mark
                     ],
@@ -121,8 +125,8 @@ class JSONReportGenerator(BaseReportGenerator):
                     "error_message": backup_result.error_message if backup_result else None,
                     "download_error": backup_result.download_error if backup_result else None,
                 },
-                "results": [r.dict() for r in results],
-                "security_issues": [i.dict() for i in security_issues],
+                "results": [r.model_dump() for r in results],
+                "security_issues": [i.model_dump() for i in security_issues],
             }
 
             # Write report

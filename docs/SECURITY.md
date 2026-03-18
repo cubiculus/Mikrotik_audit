@@ -61,8 +61,8 @@
    # Правильно
    cp .env.example .env
    # Отредактируйте .env
-   
-   # Неправильно
+
+   # Неправильно (не передавайте пароль в аргументах командной строки)
    python mikrotik_audit.py --ssh-pass mypassword
    ```
 

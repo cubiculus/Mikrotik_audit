@@ -36,11 +36,19 @@ logger = logging.getLogger(__name__)
 
 @click.group()
 def cli():
-    """MikroTik RouterOS Audit Tool - Professional configuration auditing."""
+    """MikroTik RouterOS Audit Tool - Professional configuration auditing.
+
+    audit: Run security audit on MikroTik RouterOS devices.
+    diff: Compare two JSON audit reports to find configuration drift.
+
+    Examples:
+      python -m src.cli audit --router-ip 192.168.100.1 --audit-level Standard
+      python -m src.cli diff report1.json report2.json
+    """
     pass
 
 
-@cli.command()
+@cli.command(name='audit')
 @click.option(
     '--router-ip',
     default=None,
@@ -107,6 +115,11 @@ def cli():
     help='Report formats to generate (comma-separated: html,json,txt,md)'
 )
 @click.option(
+    '--all-formats',
+    is_flag=True,
+    help='Generate all report formats (html,json,txt,md). Overrides --output-formats'
+)
+@click.option(
     '--timeout-per-command',
     default=None,
     type=int,
@@ -162,6 +175,7 @@ def main(
     redact: bool,
     dry_run: bool,
     output_formats: str,
+    all_formats: bool,
     timeout_per_command: Optional[int],
     no_cve_check: bool,
     no_progress_bar: bool,
@@ -204,7 +218,12 @@ def main(
 
         if not ssh_pass and not ssh_key_file:
             # Prompt for password securely if no SSH key provided
-            ssh_pass = click.prompt('SSH Password', hide_input=True)
+            ssh_pass = click.prompt(
+                'SSH Password',
+                hide_input=True,
+                show_default=False,
+                prompt_suffix=' (or set MIKROTIK_PASSWORD env var): '
+            )
 
         # Validate that we have at least password or SSH key
         if not ssh_pass and not ssh_key_file:
@@ -244,6 +263,31 @@ def main(
 
         # Store no_backup flag for later use
         skip_backup = no_backup
+
+        # Handle --all-formats flag (overrides --output-formats)
+        if all_formats:
+            output_formats_list = ['html', 'json', 'txt', 'md']
+            logger.info("Generating all report formats (--all-formats)")
+        else:
+            output_formats_list = [f.strip().lower() for f in output_formats.split(',')]
+
+        # Validate output formats and warn about unknown formats
+        SUPPORTED_FORMATS = {'html', 'json', 'txt', 'md'}
+        unknown_formats = set(output_formats_list) - SUPPORTED_FORMATS
+        if unknown_formats:
+            click.echo(click.style(
+                f"Warning: Unknown output format(s): {', '.join(unknown_formats)}. "
+                f"Supported formats: {', '.join(sorted(SUPPORTED_FORMATS))}",
+                fg='yellow'
+            ), err=True)
+            # Filter out unknown formats
+            output_formats_list = [f for f in output_formats_list if f in SUPPORTED_FORMATS]
+            if not output_formats_list:
+                click.echo(click.style(
+                    "Error: No valid output formats specified. Use --output-formats html,json,txt,md",
+                    fg='red'
+                ), err=True)
+                sys.exit(1)
 
         # Warn about sensitive data if not redacting
         if not redact and not dry_run:
@@ -304,15 +348,15 @@ def main(
         logger.info(f"\n{Fore.YELLOW}Generating reports...{Style.RESET_ALL}")
         generator = ReportGenerator(output_path)
 
-        generated_reports = {}
-        if 'html' in config.output_formats:
-            generated_reports['html'] = generator.generate_html_report(results, security_issues, router_info, backup_result, network_overview)
-        if 'json' in config.output_formats:
-            generated_reports['json'] = generator.generate_json_report(results, security_issues, router_info, backup_result, network_overview)
-        if 'txt' in config.output_formats:
-            generated_reports['txt'] = generator.generate_txt_report(results, security_issues, router_info, backup_result, network_overview)
-        if 'md' in config.output_formats:
-            generated_reports['md'] = generator.generate_markdown_report(results, security_issues, router_info, backup_result, network_overview)
+        # Use generate_all_reports with specified formats
+        generated_reports = generator.generate_all_reports(
+            results=results,
+            security_issues=security_issues,
+            router_info=router_info,
+            backup_result=backup_result,
+            network_overview=network_overview,
+            formats=output_formats_list
+        )
 
         # Print summary
         print_summary(results, security_issues, output_path, generated_reports)
@@ -396,12 +440,7 @@ def print_summary(
     if generated_reports:
         logger.info("Reports saved:")
         for format_type, path in generated_reports.items():
-            logger.info(f"  {format_type.upper()}: {path.name}")
-
-
-
-if __name__ == '__main__':
-    cli()
+            logger.info(f"  {format_type.upper()}: {path}")  # Показываем полный путь
 
 
 @cli.command()
@@ -414,7 +453,11 @@ if __name__ == '__main__':
     help='Output file for diff results (JSON format)'
 )
 def diff(report1: str, report2: str, output: Optional[str]):
-    """Compare two JSON audit reports and show differences."""
+    """Compare two JSON audit reports and show differences.
+
+    Shows new/resolved security issues, interface changes, and configuration drift.
+    Example: python -m src.cli diff report1.json report2.json
+    """
 
     try:
         # Load both reports
@@ -530,4 +573,8 @@ def diff(report1: str, report2: str, output: Optional[str]):
 
 def main():  # noqa: F811
     """Entry point for backward compatibility."""
+    cli()
+
+
+if __name__ == '__main__':
     cli()

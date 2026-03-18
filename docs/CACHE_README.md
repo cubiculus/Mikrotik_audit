@@ -10,13 +10,14 @@
 
 ### 1. Память (In-Memory Cache)
 - Быстрый доступ к данным
-- Автоматически очищается при достижении лимита (1000 записей)
+- Автоматически очищается при достижении лимита (100 записей)
 - Идеально для последовательных вызовов
 
 ### 2. Диск (Disk Cache)
 - Сохраняется в директории `.cache` (по умолчанию)
-- Использует pickle для сериализации
+- Использует **JSON** для сериализации (текстовый формат)
 - Сохраняется между запусками программы
+- Файлы имеют вид `<sha256_hash>.json`
 - Параметр `persist=True` для сохранения на диск
 
 ## Использование
@@ -67,15 +68,17 @@ overview = parser.build_network_overview(results)
 
 ## Ключ кэша
 
-Ключ кэша генерируется с использованием MD5-хеша от содержимого вывода команд:
+Ключ кэша генерируется с использованием **SHA256-хеша** от содержимого вывода команд:
 
 ```python
 def _get_cache_key(self, command_output: str) -> str:
-    """Generate cache key based on content."""
-    return hashlib.md5(command_output.encode()).hexdigest()
+    """Generate cache key based on content using SHA256."""
+    return hashlib.sha256(command_output.encode()).hexdigest()
 ```
 
 Это означает, что одинаковые результаты команд будут давать одинаковый ключ кэша.
+
+**Важно:** Кэш-файлы имеют имена вида `<sha256_hash>.json` (64-символьный hex-хеш).
 
 ## Очистка кэша
 
@@ -101,12 +104,12 @@ shutil.rmtree(parser.cache_dir)
 ```python
 from pathlib import Path
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 parser = DataParser()
 cache_age_limit = timedelta(days=7)
 
-for cache_file in parser.cache_dir.glob("*.pkl"):
+for cache_file in parser.cache_dir.glob("*.json"):
     file_age = datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)
     if file_age > cache_age_limit:
         cache_file.unlink()
@@ -159,9 +162,10 @@ print(f"Speedup: {first_run/cached_run:.1f}x")
 
 ## Безопасность
 
-- Кэш хранит только результаты парсинга, не оригинальные данные
-- Использует локальную файловую систему
-- Рекомендуется периодически очищать кэш для безопасности
+- Кэш хранит только результаты парсинга (структурированные данные), не оригинальные выводы команд
+- Использует локальную файловую систему в директории `.cache/`
+- Файлы кэша имеют формат JSON (можно прочитать вручную)
+- Рекомендуется периодически очищать кэш (раз в 30 дней)
 
 ## Обратная совместимость
 

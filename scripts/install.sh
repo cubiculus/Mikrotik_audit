@@ -51,10 +51,15 @@ echo
 echo "========================================"
 echo "Installation complete!"
 echo
-echo To run the audit tool:
-echo "  source venv/bin/activate"
-echo "  python -m src.cli --ssh-user admin --ssh-pass your_password"
+echo "To run the audit tool:"
+echo "  1. Configure credentials in .env file:"
+echo "     cp .env.example .env"
+echo "     # Edit .env with your settings"
+echo "  2. Run the audit:"
+echo "     source venv/bin/activate"
+echo "     python -m src.cli --ssh-user admin"
+echo "     # Password will be prompted interactively"
 echo
-echo Or use the quick command:
-echo "  ./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password"
-echo "========================================
+echo "Or use the quick command:"
+echo "  ./scripts/run_audit.sh --ssh-user admin"
+echo "========================================"

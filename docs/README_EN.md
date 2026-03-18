@@ -286,6 +286,7 @@ Mikrotik_audit/
 | `--skip-security` | Skip security analysis | No | False |
 | `--max-workers` | Maximum parallel threads | No | 0 (auto) |
 | `--redact` | Redact sensitive data from reports | No | False |
+| `--all-formats` | Generate all report formats (html,json,txt,md) | No | False |
 | `--connect-timeout` | SSH connection timeout (seconds) | No | 30 |
 | `--command-timeout` | Command execution timeout (seconds) | No | 120 |
 | `--no-backup` | Skip system backup | No | False |

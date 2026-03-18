@@ -352,6 +352,17 @@ class MikroTikAuditor:
         else:
             logger.info(f"  {Fore.GREEN}✓ No security issues found{Style.RESET_ALL}")
 
+        # Check CVE vulnerabilities if enabled
+        if self.config.enable_cve_check and self.router_info:
+            logger.info(f"\n{Fore.YELLOW}🔍 Checking CVE database...{Style.RESET_ALL}")
+            cve_issues = SecurityAnalyzer.check_cve(self.router_info.version)
+            self._security_issues.extend(cve_issues)
+
+            if cve_issues:
+                logger.info(f"  {Fore.RED}⚠ Found {len(cve_issues)} CVE vulnerability/vulnerabilities{Style.RESET_ALL}")
+            else:
+                logger.info(f"  {Fore.GREEN}✓ No CVE vulnerabilities found{Style.RESET_ALL}")
+
         return self._security_issues
 
     def get_results(self) -> List[CommandResult]:

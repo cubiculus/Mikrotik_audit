@@ -38,7 +38,7 @@ class TestCliPrompts:
                         mock_report.return_value = mock_report_instance
 
                         # Simulate user entering password when prompted
-                        result = runner.invoke(cli, ['main', '--dry-run'], input='testpassword\n')
+                        result = runner.invoke(cli, ['audit', '--dry-run'], input='testpassword\n')
 
                         # Should have prompted for password
                         assert 'SSH Password' in result.output
@@ -59,7 +59,7 @@ class TestCliExitCodes:
                 mock_instance.run_audit.return_value = False  # Audit fails
                 mock_auditor.return_value = mock_instance
 
-                result = runner.invoke(cli, ['main', '--router-ip', '192.168.100.1'])
+                result = runner.invoke(cli, ['audit', '--router-ip', '192.168.100.1'])
 
                 # Should exit with code 1 on audit failure
                 assert result.exit_code == 1
@@ -97,7 +97,7 @@ class TestCliRedactWarning:
                         mock_report.return_value = mock_report_instance
 
                         # Run without --redact flag
-                        result = runner.invoke(cli, ['main', '--router-ip', '192.168.100.1'])
+                        result = runner.invoke(cli, ['audit', '--router-ip', '192.168.100.1'])
 
                         # Should show warning about sensitive data
                         assert 'WARNING' in result.output or 'WARNING' in result.stderr

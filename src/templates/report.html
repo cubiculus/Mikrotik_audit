@@ -467,6 +467,10 @@
                 <div class="stat-label">Success Rate</div>
                 <div class="stat-value">{{ success_rate|int }}%</div>
             </div>
+            <div class="stat-card {% if security_score >= 80 %}success{% elif security_score >= 50 %}warning{% else %}danger{% endif %}">
+                <div class="stat-label">Security Score</div>
+                <div class="stat-value">{{ security_score }}/100</div>
+            </div>
             <div class="stat-card warning">
                 <div class="stat-label">Security Issues</div>
                 <div class="stat-value">{{ security_issues_count }}</div>

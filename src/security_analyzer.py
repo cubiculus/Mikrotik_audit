@@ -4,6 +4,7 @@ import re
 import logging
 from typing import List, Callable
 from src.config import CommandResult, SecurityIssue
+from src.cve_database import check_cve_for_version
 
 logger = logging.getLogger(__name__)
 
@@ -458,6 +459,50 @@ class SecurityAnalyzer:
                                 )
                         except Exception as e:
                             logger.debug(f"Check failed: {e}")
+
+        return issues
+
+    @staticmethod
+    def check_cve(router_version: str) -> List[SecurityIssue]:
+        """
+        Check RouterOS version against known CVE database.
+
+        Args:
+            router_version: RouterOS version string (e.g., "6.49.6", "7.10")
+
+        Returns:
+            List of security issues for vulnerable CVEs
+        """
+        issues: List[SecurityIssue] = []
+
+        if not router_version or router_version == "Unknown":
+            logger.warning("Router version not available, skipping CVE check")
+            return issues
+
+        logger.info(f"Checking CVE database for RouterOS version {router_version}...")
+
+        vulnerable_cves = check_cve_for_version(router_version)
+
+        for cve in vulnerable_cves:
+            issue = SecurityIssue(
+                severity=cve.severity,
+                category="CVE Vulnerability",
+                finding=f"[{cve.cve_id}] {cve.title}",
+                description=cve.description,
+                recommendation=f"{cve.recommendation} (Fixed in {cve.fixed_version})",
+                command="/system resource print"
+            )
+            issues.append(issue)
+            logger.warning(
+                f"CVE found: {cve.cve_id} - {cve.title} ({cve.severity})"
+            )
+
+        if vulnerable_cves:
+            logger.warning(
+                f"Found {len(vulnerable_cves)} CVE vulnerabilities for version {router_version}"
+            )
+        else:
+            logger.info(f"No known CVE vulnerabilities found for version {router_version}")
 
         return issues
 
