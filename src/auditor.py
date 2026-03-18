@@ -325,6 +325,7 @@ class MikroTikAuditor:
                         status = "✓" if not result.has_error else "✗"
                         pbar.set_postfix_str(f"{status} {cmd[:40]}{'...' if len(cmd) > 40 else ''}")
                         pbar.update(1)
+                        start_idx += 1
             else:
                 logger.info(f"\n{Fore.YELLOW}▶ Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
                 start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
@@ -336,7 +337,7 @@ class MikroTikAuditor:
                         f"[{Fore.CYAN}{start_idx}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
                         f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
                     )
-                start_idx += 1
+                    start_idx += 1
 
     def _analyze_security(self) -> List[SecurityIssue]:
         """Analyze security and return issues."""

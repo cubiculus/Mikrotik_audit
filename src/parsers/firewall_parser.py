@@ -152,9 +152,10 @@ def _parse_rules_with_comments(lines: List[str], known_fields: Set[str]) -> List
 
             rest = entry_match.group(3) or ''
 
-            # Если после номера сразу комментарий
-            if rest.startswith(';;;'):
-                pending_comment = rest[3:].strip()
+            # Если после номера сразу комментарий (;;; может быть после пробелов)
+            rest_stripped = rest.lstrip()
+            if rest_stripped.startswith(';;;'):
+                pending_comment = rest_stripped[3:].strip()
                 # Правило будет на следующих строках
                 current_rule_data = {}
                 continue

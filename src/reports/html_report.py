@@ -465,25 +465,24 @@ class HTMLReportGenerator(BaseReportGenerator):
             mangle_rows = []
 
             for idx, rule in enumerate(overview.mangle_rules[:50]):  # Limit to 50 rules
-                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
+                disabled_badge = '<span class="disabled-badge" style="margin-left: 6px; color: #ef4444; font-size: 0.85em;">● disabled</span>' if rule.disabled else ''
                 comment = rule.comment or ""
 
                 mangle_rows.append(f'''
                     <tr class="{'disabled-rule' if rule.disabled else ''}">
                         <td>{idx + 1}</td>
-                        <td><strong>{rule.chain or "prerouting"}</strong></td>
+                        <td><strong>{rule.chain or "prerouting"}{disabled_badge}</strong></td>
                         <td>{rule.action or "passthrough"}</td>
                         <td>{rule.new_connection_mark or rule.new_routing_mark or "-"}</td>
                         <td>{rule.protocol or "-"}</td>
                         <td>{rule.src_address or "-"}</td>
                         <td>{rule.dst_address or "-"}</td>
                         <td>{comment[:30] + "..." if len(comment) > 30 else comment}</td>
-                        <td>{disabled_badge}</td>
                     </tr>
                 ''')
 
             more_rules = len(overview.mangle_rules) - 50
-            more_html = f'<tr><td colspan="9" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more mangle rules</em></td></tr>' if more_rules > 0 else ''
+            more_html = f'<tr><td colspan="8" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more mangle rules</em></td></tr>' if more_rules > 0 else ''
 
             content_parts.append(f'''
                 <div class="info-card" style="margin-bottom: 20px;">
@@ -500,7 +499,6 @@ class HTMLReportGenerator(BaseReportGenerator):
                                 <th>Src Address</th>
                                 <th>Dst Address</th>
                                 <th>Comment</th>
-                                <th>State</th>
                             </tr>
                         </thead>
                         <tbody>{''.join(mangle_rows)}{more_html}</tbody>
@@ -514,24 +512,23 @@ class HTMLReportGenerator(BaseReportGenerator):
             routing_rows = []
 
             for idx, rule in enumerate(overview.routing_rules[:30]):  # Limit to 30 rules
-                disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
+                disabled_badge = '<span style="margin-left: 6px; color: #ef4444; font-size: 0.85em;">● disabled</span>' if rule.disabled else ''
                 comment = getattr(rule, 'comment', '') or ""
 
                 routing_rows.append(f'''
                     <tr class="{'disabled-rule' if rule.disabled else ''}">
                         <td>{idx + 1}</td>
-                        <td>{getattr(rule, 'action', 'accept')}</td>
+                        <td>{getattr(rule, 'action', 'accept')}{disabled_badge}</td>
                         <td>{getattr(rule, 'src_address', '-')}</td>
                         <td>{getattr(rule, 'dst_address', '-')}</td>
                         <td>{getattr(rule, 'in_interface', '-')}</td>
                         <td>{getattr(rule, 'out_interface', '-')}</td>
                         <td>{comment[:30] + "..." if len(comment) > 30 else comment}</td>
-                        <td>{disabled_badge}</td>
                     </tr>
                 ''')
 
             more_rules = len(overview.routing_rules) - 30
-            more_html = f'<tr><td colspan="8" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more routing rules</em></td></tr>' if more_rules > 0 else ''
+            more_html = f'<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more routing rules</em></td></tr>' if more_rules > 0 else ''
 
             content_parts.append(f'''
                 <div class="info-card">
@@ -547,7 +544,6 @@ class HTMLReportGenerator(BaseReportGenerator):
                                 <th>In Interface</th>
                                 <th>Out Interface</th>
                                 <th>Comment</th>
-                                <th>State</th>
                             </tr>
                         </thead>
                         <tbody>{''.join(routing_rows)}{more_html}</tbody>
