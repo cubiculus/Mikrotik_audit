@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import List, Optional
+from typing import List
 
 from src.models import LogEntry, HistoryEntry
 
@@ -14,34 +14,33 @@ def _parse_key_value_line(line: str) -> dict:
     data = {}
     i = 0
     n = len(line)
-    
+
     while i < n:
         # Skip whitespace
         while i < n and line[i].isspace():
             i += 1
         if i >= n:
             break
-        
+
         # Find key
         key_start = i
         while i < n and line[i] not in '=:':
             i += 1
-        
+
         if i >= n:
             break
-        
+
         key = line[key_start:i].strip().lower().replace('-', '_')
-        
+
         # Skip separator
-        sep = line[i]
         i += 1
-        
+
         # Skip whitespace
         while i < n and line[i].isspace():
             i += 1
         if i >= n:
             break
-        
+
         # Find value - handle quoted strings with spaces
         if line[i] == '"':
             # Quoted value
@@ -52,44 +51,44 @@ def _parse_key_value_line(line: str) -> dict:
             value = line[value_start:i]
             i += 1
         else:
-            # Unquoted value - read until end or specific delimiters
+            # Unquoted value - read until whitespace or end
             value_start = i
-            while i < n and line[i] not in '\n':
+            while i < n and not line[i].isspace():
                 i += 1
             value = line[value_start:i].strip()
-        
+
         data[key] = value
-    
+
     return data
 
 
 def parse_logs(results: List, count: int = 50) -> List[LogEntry]:
     """
     Parse system logs from /log print.
-    
+
     Формат вывода RouterOS:
      0  12:30:45 system,info,account user admin logged in from 192.168.1.100
      1  12:30:40 firewall,info,drop in:ether1 out: (none), src-mac 00:11:22:33:44:55, proto TCP (SYN), 192.168.1.100:54321->10.0.0.1:80, len 60
-    
+
     Или detail формат:
      0  time=12:30:45 topics=system,info,account message="user admin logged in"
     """
     entries = []
-    
+
     if not results or results[0].has_error:
         logger.warning("No log data available")
         return entries
-    
+
     output = results[0].stdout
     lines = output.split('\n')
-    
+
     for line in lines:
         line = line.rstrip()
         if not line or line.strip().startswith('Flags:'):
             continue
-        
+
         entry = LogEntry()
-        
+
         # Пробуем парсить detail формат (time=, topics=, message=)
         if 'time=' in line or 'topics=' in line:
             data = _parse_key_value_line(line)
@@ -116,41 +115,41 @@ def parse_logs(results: List, count: int = 50) -> List[LogEntry]:
                 elif len(parts) == 2:
                     entry.time = parts[1] if len(parts) > 1 else ''
                     entry.message = parts[1] if len(parts) > 1 else ''
-        
+
         # Добавляем запись если есть данные
         if entry.time or entry.message:
             entries.append(entry)
-            
+
             # Ограничиваем количество записей
             if len(entries) >= count:
                 break
-    
+
     return entries
 
 
 def parse_firewall_logs(results: List) -> List[LogEntry]:
     """
     Parse firewall logs from /log print where topics~"firewall".
-    
+
     Специализированный парсер для логов firewall.
     """
     entries = []
-    
+
     if not results or results[0].has_error:
         logger.warning("No firewall log data available")
         return entries
-    
+
     output = results[0].stdout
     lines = output.split('\n')
-    
+
     for line in lines:
         line = line.rstrip()
         if not line or line.strip().startswith('Flags:'):
             continue
-        
+
         entry = LogEntry()
         entry.topics = 'firewall'
-        
+
         # Парсим логи firewall
         # Формат: "0  12:30:40 firewall,info,drop in:ether1 out: (none), src-mac ..."
         match = re.match(r'^\s*\d+\s+(\d{2}:\d{2}:\d{2})\s+firewall,(\w+),(\w+)\s+(.*)$', line)
@@ -165,48 +164,62 @@ def parse_firewall_logs(results: List) -> List[LogEntry]:
             entry.message = data.get('message', '')
             if data.get('topics', ''):
                 entry.topics = data.get('topics', '')
-        
+
         if entry.time or entry.message:
             entries.append(entry)
-    
+
     return entries
 
 
 def parse_history(results: List) -> List[HistoryEntry]:
     """
     Parse system history from /system history print.
-    
+
     Формат вывода RouterOS:
      0  12:30:45 by=admin add /ip address address=192.168.1.1/24 interface=ether1
      1  12:25:30 by=admin remove /ip firewall filter numbers=5
      2  12:20:15 by=admin set /interface ether name=ether1
-    
+
     Или detail формат:
      0  time=12:30:45 action=add cmd="/ip address add address=192.168.1.1/24" by=admin
     """
     entries = []
-    
+
     if not results or results[0].has_error:
         logger.warning("No history data available")
         return entries
-    
+
     output = results[0].stdout
     lines = output.split('\n')
-    
+
     for line in lines:
         line = line.rstrip()
         if not line or line.strip().startswith('Flags:'):
             continue
-        
+
+        # Skip header line "Columns: TIME, BY, ACTION, CMD"
+        if 'Columns:' in line:
+            continue
+
         entry = HistoryEntry()
-        
-        # Пробуем парсить detail формат
-        if 'time=' in line or 'action=' in line:
-            data = _parse_key_value_line(line)
-            entry.time = data.get('time', '')
-            entry.action = data.get('action', '')
-            entry.by = data.get('by', '')
-            entry.cmd = data.get('cmd', '')
+
+        # Пробуем парсить detail формат (time=, action=, by=, cmd=)
+        # Detail format: "0  time=12:30:45 action=add cmd="..." by=admin"
+        if 'time=' in line and 'action=' in line:
+            # Extract fields using regex for detail format
+            time_match = re.search(r'time=(\S+)', line)
+            action_match = re.search(r'action=(\S+)', line)
+            by_match = re.search(r'by=(\S+)', line)
+            cmd_match = re.search(r'cmd="([^"]+)"', line)
+
+            if time_match:
+                entry.time = time_match.group(1)
+            if action_match:
+                entry.action = action_match.group(1)
+            if by_match:
+                entry.by = by_match.group(1)
+            if cmd_match:
+                entry.cmd = cmd_match.group(1)
         else:
             # Парсим компактный формат
             # Формат: "0  12:30:45 by=admin action /path cmd"
@@ -223,18 +236,18 @@ def parse_history(results: List) -> List[HistoryEntry]:
                     entry.time = parts[1] if len(parts) > 1 else ''
                     entry.action = parts[2] if len(parts) > 2 else ''
                     entry.cmd = parts[3] if len(parts) > 3 else ''
-        
+
         # Добавляем запись если есть данные
         if entry.time or entry.cmd:
             entries.append(entry)
-    
+
     return entries
 
 
 def parse_ping_results(results: List) -> dict:
     """
     Parse ping test results.
-    
+
     Формат вывода RouterOS:
      SEQ HOST SIZE TTL TIME STATUS
        0 8.8.8.8 56 116 2ms
@@ -253,13 +266,13 @@ def parse_ping_results(results: List) -> dict:
         'max_rtt': '',
         'results': [],
     }
-    
+
     if not results or results[0].has_error:
         logger.warning("No ping data available")
         return ping_result
-    
+
     output = results[0].stdout
-    
+
     # Извлекаем target из команды
     for r in results:
         if '/ping' in r.command:
@@ -267,14 +280,14 @@ def parse_ping_results(results: List) -> dict:
             if match:
                 ping_result['target'] = match.group(1)
             break
-    
+
     # Парсим результаты
     lines = output.split('\n')
     for line in lines:
         line = line.strip()
         if not line:
             continue
-        
+
         # Ищем статистику
         if 'sent=' in line and 'received=' in line:
             data = _parse_key_value_line(line)
@@ -282,10 +295,10 @@ def parse_ping_results(results: List) -> dict:
                 ping_result['sent'] = int(data.get('sent', '0'))
                 ping_result['received'] = int(data.get('received', '0'))
                 ping_result['lost'] = int(data.get('lost', '0'))
-                
+
                 if ping_result['sent'] > 0:
                     ping_result['loss_percent'] = (ping_result['lost'] / ping_result['sent']) * 100
-                
+
                 ping_result['avg_rtt'] = data.get('avg_rtt', '') or data.get('avg-rtt', '')
                 ping_result['min_rtt'] = data.get('min_rtt', '') or data.get('min-rtt', '')
                 ping_result['max_rtt'] = data.get('max_rtt', '') or data.get('max-rtt', '')
@@ -305,5 +318,5 @@ def parse_ping_results(results: List) -> dict:
                     'status': ' '.join(parts[5:]) if len(parts) > 5 else 'ok',
                 }
                 ping_result['results'].append(ping_entry)
-    
+
     return ping_result

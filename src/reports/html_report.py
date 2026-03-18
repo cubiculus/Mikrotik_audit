@@ -295,13 +295,56 @@ class HTMLReportGenerator(BaseReportGenerator):
             html += "</p></div>"
             return html
         elif backup_result.status == "skipped":
+            # Определяем понятное сообщение о причине пропуска
+            reason = backup_result.error_message or "Not required"
+            detailed_reason = ""
+            icon = "⚠️"
+
+            if "permission" in reason.lower() or "write" in reason.lower():
+                detailed_reason = """
+                    <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
+                        <strong>📝 Причина:</strong> У пользователя нет прав на запись (требуется 'write' или 'full')<br>
+                        <strong>🔧 Решение:</strong> Создайте пользователя с правами 'write' или 'full' для создания резервных копий<br>
+                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                    </div>
+                """
+                icon = "🔒"
+            elif "sftp" in reason.lower() or "не поддерживается" in reason.lower():
+                # Извлекаем имя файла бэкапа если есть
+                backup_filename = backup_result.file_name or "audit_backup_*.backup"
+                detailed_reason = f"""
+                    <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
+                        <strong>📝 Причина:</strong> SFTP не поддерживается на этом роутере<br>
+                        <strong>✅ Статус:</strong> Бэкап создан, но не может быть скачан автоматически<br>
+                        <strong>🔧 Решение:</strong> Подключитесь через WinBox или Terminal и скачайте файл вручную:<br>
+                        <code style='background:#f0f0f0;padding:4px 8px;border-radius:3px;display:inline-block;margin-top:5px'>/file print detail where name="{backup_filename}"</code><br>
+                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                    </div>
+                """
+                icon = "📁"
+            elif "not required" in reason.lower() or "not needed" in reason.lower():
+                detailed_reason = """
+                    <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
+                        <strong>📝 Причина:</strong> Резервное копирование не было запрошено<br>
+                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                    </div>
+                """
+            else:
+                detailed_reason = f"""
+                    <div style='background:#fffbeb;padding:12px;border-radius:4px;margin-top:10px;font-size:0.9em'>
+                        <strong>📝 Причина:</strong> {reason}<br>
+                        <strong>ℹ️ Важно:</strong> Аудит безопасности и сбор информации выполнены успешно
+                    </div>
+                """
+
             html = "<div style='background:#fef3c7;padding:20px;border-radius:8px;border-left:4px solid #f59e0b'>"
-            html += "<h3 style='margin:0;color:#92400e'>⚠️ Backup Skipped</h3>"
+            html += f"<h3 style='margin:0;color:#92400e'>{icon} Backup Skipped</h3>"
             html += "<p style='margin:5px 0;color:#92400e'>"
             html += f"<strong>Timestamp:</strong> {backup_result.timestamp}<br>"
-            html += f"<strong>Reason:</strong> {backup_result.error_message or 'Not required'}<br>"
-            html += "<em>Note: This does not affect the audit results. Only the backup file was not created.</em>"
-            html += "</p></div>"
+            html += f"<strong>Reason:</strong> {reason}"
+            html += "</p>"
+            html += detailed_reason
+            html += "</div>"
             return html
         else:
             html = "<div style='background:#fee2e2;padding:20px;border-radius:8px;border-left:4px solid #ef4444'>"
@@ -560,7 +603,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
 
             total = len(leases)
-            static_count = sum(1 for l in leases if not getattr(l, 'dynamic', False))
+            static_count = sum(1 for lease in leases if not getattr(lease, 'dynamic', False))
             dynamic_count = total - static_count
 
             return f'''
@@ -752,59 +795,61 @@ class HTMLReportGenerator(BaseReportGenerator):
         try:
             if not overview.system_resource:
                 return '<p>No system resource data available</p>'
-            
+
             res = overview.system_resource
             html_parts = ['<div class="info-grid">']
-            
+
             # CPU and Memory
             cpu_load_str = ', '.join(f'{x}%' for x in res.cpu_load) if res.cpu_load else 'N/A'
             mem_percent = (res.total_memory - res.free_memory) / res.total_memory * 100 if res.total_memory > 0 else 0
-            
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">CPU Load:</span>
                     <span class="info-value">{cpu_load_str}</span>
                 </div>
             ''')
-            
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">Memory:</span>
                     <span class="info-value">{res.free_memory // (1024*1024)}MB / {res.total_memory // (1024*1024)}MB ({mem_percent:.1f}% used)</span>
                 </div>
             ''')
-            
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">HDD:</span>
                     <span class="info-value">{res.free_hdd // (1024*1024)}MB / {res.total_hdd // (1024*1024)}MB</span>
                 </div>
             ''')
-            
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">Uptime:</span>
                     <span class="info-value">{res.uptime or 'N/A'}</span>
                 </div>
             ''')
-            
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">Version:</span>
                     <span class="info-value">{res.version or 'N/A'}</span>
                 </div>
             ''')
-            
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">Board:</span>
                     <span class="info-value">{res.board_name or 'N/A'}</span>
                 </div>
             ''')
-            
+
             # Health info
             if overview.system_health:
                 health = overview.system_health
+
+                # Standard health metrics
                 if health.temperature:
                     html_parts.append(f'''
                         <div class="info-item">
@@ -819,7 +864,91 @@ class HTMLReportGenerator(BaseReportGenerator):
                             <span class="info-value">{health.voltage}</span>
                         </div>
                     ''')
-            
+
+                # Advanced health metrics (CCR/CRS only)
+                if health.psu1_state or health.psu2_state:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">PSU Status:</span>
+                            <span class="info-value">
+                                {'PSU1: ' + health.psu1_state if health.psu1_state else ''}
+                                {', ' if health.psu1_state and health.psu2_state else ''}
+                                {'PSU2: ' + health.psu2_state if health.psu2_state else ''}
+                            </span>
+                        </div>
+                    ''')
+                if health.psu1_voltage or health.psu2_voltage:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">PSU Voltage:</span>
+                            <span class="info-value">
+                                {'PSU1: ' + health.psu1_voltage if health.psu1_voltage else ''}
+                                {', ' if health.psu1_voltage and health.psu2_voltage else ''}
+                                {'PSU2: ' + health.psu2_voltage if health.psu2_voltage else ''}
+                            </span>
+                        </div>
+                    ''')
+                if health.fan1_speed or health.fan2_speed:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">Fan Speed:</span>
+                            <span class="info-value">
+                                {'Fan1: ' + health.fan1_speed + ' RPM' if health.fan1_speed else ''}
+                                {', ' if health.fan1_speed and health.fan2_speed else ''}
+                                {'Fan2: ' + health.fan2_speed + ' RPM' if health.fan2_speed else ''}
+                            </span>
+                        </div>
+                    ''')
+                if health.board_temperature1 or health.board_temperature2:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">Board Temperature:</span>
+                            <span class="info-value">
+                                {'Board1: ' + health.board_temperature1 if health.board_temperature1 else ''}
+                                {', ' if health.board_temperature1 and health.board_temperature2 else ''}
+                                {'Board2: ' + health.board_temperature2 if health.board_temperature2 else ''}
+                            </span>
+                        </div>
+                    ''')
+                if health.junction_temperature:
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">Junction Temperature:</span>
+                            <span class="info-value">{health.junction_temperature}</span>
+                        </div>
+                    ''')
+
+            # Ping results (connectivity check)
+            if overview.ping_results:
+                ping_html = '<div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 6px;">'
+                ping_html += '<h4 style="margin-bottom: 10px; color: #667eea;">📡 Connectivity Check</h4>'
+
+                for target, result in overview.ping_results.items():
+                    if isinstance(result, dict):
+                        packets_sent = result.get('packets_sent', 0)
+                        packets_received = result.get('packets_received', 0)
+                        packet_loss = result.get('packet_loss', '0%')
+                        rtt = result.get('rtt', 'N/A')
+
+                        status_color = '#10b981' if packets_received > 0 else '#ef4444'
+                        status_text = '✓ Reachable' if packets_received > 0 else '✗ Unreachable'
+
+                        ping_html += f'''
+                            <div style="display: inline-block; margin-right: 20px; padding: 10px; background: white; border-radius: 6px; border-left: 4px solid {status_color};">
+                                <strong style="color: {status_color};">{status_text}</strong><br>
+                                <span style="font-size: 0.9em;">Target: {target}</span><br>
+                                <span style="font-size: 0.85em; color: #666;">
+                                    {packets_received}/{packets_sent} packets ({packet_loss} loss)
+                                    {f' • RTT: {rtt}' if rtt != 'N/A' else ''}
+                                </span>
+                            </div>
+                        '''
+                    elif isinstance(result, str):
+                        ping_html += f'<div style="color: #ef4444;">{target}: {result}</div>'
+
+                ping_html += '</div>'
+                html_parts.append(ping_html)
+
             # Update info
             if overview.package_update:
                 update = overview.package_update
@@ -830,10 +959,10 @@ class HTMLReportGenerator(BaseReportGenerator):
                             <span class="info-value" style="color: #f59e0b;">{update.get('installed_version', '')} → {update.get('latest_version', '')}</span>
                         </div>
                     ''')
-            
+
             html_parts.append('</div>')
             return ''.join(html_parts)
-            
+
         except Exception as e:
             logger.error(f"Error creating system info section: {e}")
             return f'<p style="color: #d11;">Error creating system info section: {e}</p>'
@@ -843,7 +972,7 @@ class HTMLReportGenerator(BaseReportGenerator):
         try:
             if not overview.services:
                 return '<p>No service data available</p>'
-            
+
             rows = []
             for svc in overview.services:
                 status_class = 'status-error' if svc.disabled else 'status-success'
@@ -858,7 +987,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                         <td>{svc.comment or '-'}</td>
                     </tr>
                 ''')
-            
+
             return f'''
                 <div style="overflow-x: auto;">
                     <table class="commands-table">
@@ -885,7 +1014,7 @@ class HTMLReportGenerator(BaseReportGenerator):
         try:
             if not overview.certificates:
                 return '<p>No certificate data available</p>'
-            
+
             rows = []
             for cert in overview.certificates:
                 expired_class = 'style="background: #fef2f2;"' if cert.expired else ''
@@ -900,7 +1029,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                         <td>{cert.key_type} {cert.key_size}-bit</td>
                     </tr>
                 ''')
-            
+
             return f'''
                 <div style="overflow-x: auto;">
                     <table class="commands-table">
@@ -926,7 +1055,7 @@ class HTMLReportGenerator(BaseReportGenerator):
         """Create scripts and scheduler section."""
         try:
             html_parts = []
-            
+
             # Scripts
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Scripts</h3>')
             if overview.scripts:
@@ -957,7 +1086,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
             else:
                 html_parts.append('<p>No scripts found</p>')
-            
+
             # Schedulers
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Scheduled Tasks</h3>')
             if overview.schedulers:
@@ -991,7 +1120,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
             else:
                 html_parts.append('<p>No scheduled tasks found</p>')
-            
+
             return ''.join(html_parts)
         except Exception as e:
             logger.error(f"Error creating scripts section: {e}")
@@ -1001,7 +1130,7 @@ class HTMLReportGenerator(BaseReportGenerator):
         """Create network topology section (Bridge, WireGuard, PPP, ARP)."""
         try:
             html_parts = []
-            
+
             # Bridge Ports
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Bridge Ports</h3>')
             if overview.bridge_ports:
@@ -1034,7 +1163,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
             else:
                 html_parts.append('<p>No bridge ports found</p>')
-            
+
             # WireGuard Peers
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">WireGuard Peers</h3>')
             if overview.wireguard_peers:
@@ -1067,7 +1196,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
             else:
                 html_parts.append('<p>No WireGuard peers found</p>')
-            
+
             # PPP Active
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Active VPN Connections</h3>')
             if overview.ppp_active:
@@ -1100,7 +1229,45 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
             else:
                 html_parts.append('<p>No active VPN connections</p>')
-            
+
+            # ARP Table
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">ARP Table</h3>')
+            if overview.arp_entries:
+                rows = []
+                for arp in overview.arp_entries[:50]:  # Limit to 50 entries
+                    status_icon = '✓' if arp.status == 'completed' else '⚠'
+                    dynamic_badge = '<span style="color: #666; font-size: 0.8em;">(D)</span>' if arp.dynamic else '<span style="color: #667eea; font-size: 0.8em;">(S)</span>'
+                    rows.append(f'''
+                        <tr>
+                            <td>{arp.address}</td>
+                            <td>{arp.mac_address}</td>
+                            <td>{arp.interface}</td>
+                            <td>{status_icon} {arp.status.title()}</td>
+                            <td>{dynamic_badge}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>MAC Address</th>
+                                    <th>Interface</th>
+                                    <th>Status</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                    <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
+                        Showing {len(overview.arp_entries)} entries. (D) = Dynamic, (S) = Static
+                    </p>
+                ''')
+            else:
+                html_parts.append('<p>No ARP entries found</p>')
+
             return ''.join(html_parts)
         except Exception as e:
             logger.error(f"Error creating topology section: {e}")
@@ -1110,7 +1277,7 @@ class HTMLReportGenerator(BaseReportGenerator):
         """Create diagnostics section (logs, history)."""
         try:
             html_parts = []
-            
+
             # Recent Logs
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Recent Logs (last 50)</h3>')
             if overview.logs:
@@ -1141,7 +1308,37 @@ class HTMLReportGenerator(BaseReportGenerator):
                     html_parts.append(f'<p style="color: #666; font-style: italic;">... and {len(overview.logs) - 20} more entries</p>')
             else:
                 html_parts.append('<p>No log entries found</p>')
-            
+
+            # Firewall Logs
+            html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Firewall Logs</h3>')
+            if overview.firewall_logs:
+                rows = []
+                for log in overview.firewall_logs[:30]:  # Show only first 30
+                    rows.append(f'''
+                        <tr>
+                            <td>{log.time}</td>
+                            <td style="max-width: 400px; word-break: break-word;">{log.message}</td>
+                        </tr>
+                    ''')
+                html_parts.append(f'''
+                    <div style="overflow-x: auto;">
+                        <table class="commands-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                    <p style="color: #666; font-style: italic; margin-top: 10px;">
+                        Showing {len(overview.firewall_logs)} firewall log entries
+                    </p>
+                ''')
+            else:
+                html_parts.append('<p>No firewall log entries found</p>')
+
             # Configuration History
             html_parts.append('<h3 style="margin-top: 20px; color: #667eea;">Configuration History</h3>')
             if overview.history:
@@ -1172,7 +1369,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                 ''')
             else:
                 html_parts.append('<p>No history entries found</p>')
-            
+
             return ''.join(html_parts)
         except Exception as e:
             logger.error(f"Error creating diagnostics section: {e}")

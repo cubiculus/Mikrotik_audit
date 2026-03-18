@@ -1,7 +1,7 @@
 """Data models for MikroTik audit results."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -231,13 +231,19 @@ class SystemResource:
     voltage: str = ""
     psu1_state: str = ""
     psu2_state: str = ""
-    poe_out_state: str = ""
+    psu1_voltage: str = ""
+    psu2_voltage: str = ""
+    fan1_speed: str = ""
+    fan2_speed: str = ""
     fan_state: str = ""
+    poe_out_state: str = ""
+    board_temperature1: str = ""
+    board_temperature2: str = ""
+    junction_temperature: str = ""
     heap_size: int = 0
     free_heap: int = 0
     architecture_name: str = ""
     platform: str = ""
-    serial_number: str = ""
 
 
 @dataclass

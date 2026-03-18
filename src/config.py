@@ -4,11 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 import os
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv(dotenv_path=".env")
-except ImportError:
-    pass
+# Note: load_dotenv() is called in cli.py with absolute path to project root
 
 class AuditLevel(str, Enum):
     BASIC = "Basic"
@@ -24,6 +20,7 @@ class RouterConfig(BaseModel):
     ssh_key_passphrase: Optional[str] = Field(default_factory=lambda: os.getenv("MIKROTIK_SSH_KEY_PASSPHRASE"))  # Пароль для ключа
     connect_timeout: int = 30
     command_timeout: int = 120
+    timeout_per_command: Optional[int] = None  # Optional per-command timeout (overrides command_timeout)
     max_retries: int = 3
 
     @field_validator('ssh_port')
@@ -34,11 +31,11 @@ class RouterConfig(BaseModel):
             raise ValueError(f"SSH port must be between 1 and 65535, got {v}")
         return v
 
-    @field_validator('connect_timeout', 'command_timeout', 'max_retries')
+    @field_validator('connect_timeout', 'command_timeout', 'timeout_per_command', 'max_retries')
     @classmethod
     def validate_positive_integers(cls, v, field):
         """Validate timeout and retry values are positive."""
-        if v <= 0:
+        if v is not None and v <= 0:
             raise ValueError(f"{field.field_name} must be positive, got {v}")
         return v
 
@@ -47,8 +44,11 @@ class AuditConfig(BaseModel):
     audit_level: AuditLevel = Field(default=AuditLevel.STANDARD)
     skip_security_check: bool = False
     output_dir: Optional[str] = None
-    max_workers: int = 5
+    max_workers: int = 0  # 0 = auto-calculate optimal workers based on command count
     redact_sensitive: bool = False  # Маскирование чувствительных данных (PPP-секреты, пароли, серийный номер)
+    output_formats: list = Field(default_factory=lambda: ["html", "json"])  # Report formats to generate
+    enable_cve_check: bool = True  # Check RouterOS version against CVE database
+    show_progress_bar: bool = True  # Show tqdm progress bar instead of verbose logs
 
 class CommandResult(BaseModel):
     index: int

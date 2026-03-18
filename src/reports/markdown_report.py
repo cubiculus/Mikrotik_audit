@@ -32,9 +32,6 @@ class MarkdownReportGenerator(BaseReportGenerator):
         try:
             # Prepare statistics
             stats = self._get_report_statistics(results)
-            total_commands = stats["total_commands"]
-            failed_commands = stats["failed_commands"]
-            success_rate = stats["success_rate"]
 
             # Build report content
             content = self._build_markdown_report(
@@ -213,11 +210,12 @@ class MarkdownReportGenerator(BaseReportGenerator):
         # Interfaces
         if overview.interfaces:
             lines.append("### Interfaces\n")
-            lines.append("| Name | Type | IP Address | Status |")
-            lines.append("|------|------|------------|--------|")
+            lines.append("| Name | Type | MAC Address | Status |")
+            lines.append("|------|------|-------------|--------|")
             for iface in overview.interfaces[:20]:
                 status = "🟢 Up" if getattr(iface, 'running', True) else "🔴 Down"
-                lines.append(f"| `{iface.name}` | {iface.type} | {iface.ip_address or '-'} | {status} |")
+                mac = getattr(iface, 'mac_address', '') or '-'
+                lines.append(f"| `{iface.name}` | {iface.type} | {mac} | {status} |")
             if len(overview.interfaces) > 20:
                 lines.append(f"\n*...and {len(overview.interfaces) - 20} more interfaces*")
             lines.append("")

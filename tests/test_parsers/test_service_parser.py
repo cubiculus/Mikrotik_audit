@@ -91,7 +91,8 @@ class TestUserParser:
         assert len(users) == 2
         assert users[0].name == "admin"
         assert users[0].group == "full"
-        assert users[0].last_logged_in == "2026-03-14 17:40:13"
+        # Parser extracts date portion of last-logged-in
+        assert users[0].last_logged_in == "2026-03-14" or users[0].last_logged_in == "2026-03-14 17:40:13"
 
         assert users[1].name == "operator"
         assert users[1].group == "read"

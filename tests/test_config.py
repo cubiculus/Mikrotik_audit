@@ -111,7 +111,7 @@ class TestAuditConfig:
         assert config.audit_level == AuditLevel.STANDARD
         assert config.skip_security_check is False
         assert config.output_dir is None
-        assert config.max_workers == 5
+        assert config.max_workers == 0  # 0 = auto-calculate
         assert isinstance(config.router, RouterConfig)
 
     def test_custom_values(self):

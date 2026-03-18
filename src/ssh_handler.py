@@ -5,11 +5,10 @@ import logging
 import re
 import os
 import stat
-from typing import Tuple, Optional
+from typing import Tuple
 from contextlib import contextmanager
 from queue import Queue, Empty
 from threading import Lock
-import time
 from pathlib import Path
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from src.config import RouterConfig
@@ -20,23 +19,43 @@ logger = logging.getLogger(__name__)
 def _sanitize_command(command: str) -> str:
     """
     Sanitize command string to prevent shell injection attacks.
-    
+
     Only allows safe characters for MikroTik RouterOS commands.
     Blocks dangerous shell metacharacters.
+
+    Returns only the first safe segment of the command.
+    If dangerous characters are found, the command is truncated at that point.
     """
     # Remove dangerous shell metacharacters
-    dangerous_chars = [';', '|', '&', '$', '`', '(', ')', '{', '}', '<', '>', '!', '\\']
-    for char in dangerous_chars:
-        if char in command:
-            logger.warning(f"Dangerous character '{char}' detected in command, removing")
-            command = command.replace(char, '')
-    
+    # Note: ! is NOT removed as it's RouterOS negation operator (e.g., routing-mark!="")
+    # Note: ~ is NOT removed as it's RouterOS regex match operator (e.g., topics~"firewall")
+    dangerous_chars = [';', '|', '&', '$', '`', '(', ')', '{', '}', '<', '>', '\\']
+
+    # Find the first dangerous character and truncate the command there
+    for i, char in enumerate(command):
+        if char in dangerous_chars:
+            logger.warning(f"Dangerous character '{char}' detected at position {i}, truncating command")
+            command = command[:i]
+            break
+
     # Allow only safe characters for RouterOS commands
-    # RouterOS commands use: alphanumeric, /, -, _, :, ., space, =, [, ], ", '
-    safe_pattern = re.compile(r'^[a-zA-Z0-9/\-_:\. =\[\]"\']+$')
+    # RouterOS commands use: alphanumeric, /, -, _, :, ., space, =, [, ], ", ', !, ~, ,
+    # ! is negation operator (e.g., routing-mark!="")
+    # ~ is regex match operator (e.g., topics~"firewall")
+    # , is used in port lists (e.g., dst-port=[80,443])
+    safe_pattern = re.compile(r'^[a-zA-Z0-9/\-_\:\.\s=\[\]"\'!~,]+$')
+
     if not safe_pattern.match(command.strip()):
-        logger.warning(f"Command contains potentially unsafe characters: {command}")
-    
+        # If command still has unsafe characters, log warning and return empty
+        # This handles cases where command starts with unsafe chars
+        logger.warning(f"Command contains unsafe characters after sanitization: {command}")
+        # Strip and keep only the safe prefix
+        stripped = command.strip()
+        for i, char in enumerate(stripped):
+            if not safe_pattern.match(stripped[:i+1]):
+                logger.warning(f"Truncating at unsafe character at position {i}")
+                return stripped[:i]
+
     return command.strip()
 
 
@@ -60,8 +79,7 @@ class SSHConnectionPool:
     def get_connection(self):
         """Получить соединение из пула."""
         conn = None
-        created_new = False
-        
+
         try:
             # Пытаемся получить из пула без блокировки
             if not self._pool.empty():
@@ -84,8 +102,7 @@ class SSHConnectionPool:
                     if self._active_connections < self.max_connections:
                         conn = self._create_connection()
                         self._active_connections += 1
-                        created_new = True
-                
+
                 # Если не смогли создать (лимит достигнут), ждем освобождения БЕЗ блокировки
                 if conn is None:
                     try:
@@ -162,7 +179,7 @@ class SSHConnectionPool:
         client = paramiko.SSHClient()
         # AutoAddPolicy adds unknown host keys (for first connection)
         # For production use, consider RejectPolicy with pre-saved known_hosts
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
 
         try:
             # Prepare connection parameters
@@ -259,7 +276,7 @@ class SSHHandler:
     def connect(self) -> None:
         """
         Проверка доступности пула соединений.
-        
+
         Этот метод больше не создает постоянное соединение — пул управляет соединениями автоматически.
         Вызывается для проверки возможности подключения.
         """
@@ -277,12 +294,15 @@ class SSHHandler:
         """Выполнить команду (использует пул соединений)."""
         # Sanitize command to prevent shell injection
         sanitized_command = _sanitize_command(command)
-        
+
+        # Use timeout_per_command if set, otherwise use default command_timeout
+        timeout = self.config.timeout_per_command or self.config.command_timeout
+
         with self.connection_pool.get_connection() as conn:
             try:
                 stdin, stdout, stderr = conn.exec_command(
                     sanitized_command,
-                    timeout=self.config.command_timeout
+                    timeout=timeout
                 )  # nosec B601
                 exit_status = stdout.channel.recv_exit_status()
                 out = stdout.read().decode('utf-8', errors='ignore')

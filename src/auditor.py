@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from colorama import Fore, Style
+from tqdm import tqdm
 
 from src.config import (
     AuditConfig, AuditLevel, CommandResult,
@@ -98,13 +99,21 @@ class MikroTikAuditor:
         """
         Determine optimal number of workers for I/O-bound SSH tasks.
 
+        If max_workers is 0 (default), applies smart calculation
+        based on command count and RouterOS capabilities.
+        Otherwise, uses the user-configured value.
+
         SSH commands are network-bound (95%+ wait time), not CPU-bound.
         RouterOS typically handles 3-5 parallel SSH sessions well.
         """
         command_count = len(self.get_audit_commands())
 
+        # If user configured a specific max_workers value (> 0), use it
+        if self.config.max_workers > 0:
+            return max(1, self.config.max_workers)
+
+        # Smart calculation for default behavior (max_workers=0)
         # Base workers for I/O-bound tasks (network latency)
-        # RouterOS limits: typically 3-5 parallel SSH sessions max
         base_workers = 4
 
         if command_count < 10:
@@ -152,18 +161,34 @@ class MikroTikAuditor:
                 for i, cmd in enumerate(commands)
             }
 
-            for future in as_completed(futures):
-                index, cmd = futures[future]
-                try:
-                    result = future.result()
-                    self.results.append(result)
-                    status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
-                    logger.info(
-                        f"[{Fore.CYAN}{index}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
-                        f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
-                    )
-                except Exception as e:
-                    logger.error(f"[{index}] Failed: {e}")
+            # Use tqdm for progress bar if enabled
+            if self.config.show_progress_bar:
+                with tqdm(total=len(futures), desc="Executing commands", unit="cmd") as pbar:
+                    for future in as_completed(futures):
+                        index, cmd = futures[future]
+                        try:
+                            result = future.result()
+                            self.results.append(result)
+                            status = "✓" if not result.has_error else "✗"
+                            pbar.set_postfix_str(f"{status} {cmd[:40]}{'...' if len(cmd) > 40 else ''}")
+                            pbar.update(1)
+                        except Exception as e:
+                            pbar.set_postfix_str(f"✗ {cmd[:40]}{'...' if len(cmd) > 40 else ''} (Error: {str(e)[:20]})")
+                            pbar.update(1)
+            else:
+                # Verbose logging mode
+                for future in as_completed(futures):
+                    index, cmd = futures[future]
+                    try:
+                        result = future.result()
+                        self.results.append(result)
+                        status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
+                        logger.info(
+                            f"[{Fore.CYAN}{index}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
+                            f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
+                        )
+                    except Exception as e:
+                        logger.error(f"[{index}] Failed: {e}")
 
     def run_audit(self) -> bool:
         """Run complete audit."""
@@ -202,7 +227,11 @@ class MikroTikAuditor:
 
             logger.info(f"\n{Fore.CYAN}📋 Audit Configuration:{Style.RESET_ALL}")
             logger.info(f"  Level: {Fore.YELLOW}{self.config.audit_level.value}{Style.RESET_ALL}")
-            logger.info(f"  Optimal Workers: {Fore.YELLOW}{optimal_workers}{Style.RESET_ALL} (detected)")
+            # Show user-provided vs auto-calculated
+            if self.config.max_workers > 0:
+                logger.info(f"  Workers: {Fore.YELLOW}{optimal_workers}{Style.RESET_ALL} (user-configured)")
+            else:
+                logger.info(f"  Workers: {Fore.YELLOW}{optimal_workers}{Style.RESET_ALL} (auto-detected)")
             logger.info(f"  Commands: {Fore.YELLOW}{total}{Style.RESET_ALL}")
             logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}\n")
 
@@ -238,7 +267,7 @@ class MikroTikAuditor:
             self._analyze_security()
 
             # Prepare output directory
-            output_dir = Path(self.config.output_dir or f"mikrotik-audit-{self.get_timestamp()}")
+            output_dir = Path(self.config.output_dir or f"audit-reports/{self.get_timestamp()}")
 
             # Return output_dir for use by caller
             self._output_dir = output_dir
@@ -257,33 +286,56 @@ class MikroTikAuditor:
         """Execute command phases."""
         # Phase 1: Fast commands
         if grouped['fast']:
-            logger.info(f"\n{Fore.YELLOW}▶ Phase 1: Fast commands ({len(grouped['fast'])})...{Style.RESET_ALL}\n")
-            self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total)
+            if self.config.show_progress_bar:
+                with tqdm(total=len(grouped['fast']), desc="Phase 1: Fast commands", unit="cmd", leave=False) as pbar:
+                    self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total)
+            else:
+                logger.info(f"\n{Fore.YELLOW}▶ Phase 1: Fast commands ({len(grouped['fast'])})...{Style.RESET_ALL}\n")
+                self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total)
 
         # Phase 2: Heavy commands
         if grouped['heavy']:
-            logger.info(f"\n{Fore.YELLOW}▶ Phase 2: Heavy commands ({len(grouped['heavy'])})...{Style.RESET_ALL}\n")
-            start_idx = len(grouped['fast']) + 1
-            self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), start_idx, total)
+            if self.config.show_progress_bar:
+                with tqdm(total=len(grouped['heavy']), desc="Phase 2: Heavy commands", unit="cmd", leave=False) as pbar:
+                    self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), len(grouped['fast']) + 1, total)
+            else:
+                logger.info(f"\n{Fore.YELLOW}▶ Phase 2: Heavy commands ({len(grouped['heavy'])})...{Style.RESET_ALL}\n")
+                start_idx = len(grouped['fast']) + 1
+                self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), start_idx, total)
 
         # Phase 3: Normal commands
         if grouped['normal']:
-            logger.info(f"\n{Fore.YELLOW}▶ Phase 3: Normal commands ({len(grouped['normal'])})...{Style.RESET_ALL}\n")
-            start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
-            self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total)
+            if self.config.show_progress_bar:
+                with tqdm(total=len(grouped['normal']), desc="Phase 3: Normal commands", unit="cmd", leave=False) as pbar:
+                    start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
+                    self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total)
+            else:
+                logger.info(f"\n{Fore.YELLOW}▶ Phase 3: Normal commands ({len(grouped['normal'])})...{Style.RESET_ALL}\n")
+                start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
+                self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total)
 
         # Phase 4: Dependent commands (sequential)
         if grouped['dependent']:
-            logger.info(f"\n{Fore.YELLOW}▶ Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
-            start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
-            for cmd in grouped['dependent']:
-                result = self.execute_command(start_idx, cmd)
-                self.results.append(result)
-                status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
-                logger.info(
-                    f"[{Fore.CYAN}{start_idx}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
-                    f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
-                )
+            if self.config.show_progress_bar:
+                with tqdm(total=len(grouped['dependent']), desc="Phase 4: Dependent commands", unit="cmd", leave=False) as pbar:
+                    start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
+                    for cmd in grouped['dependent']:
+                        result = self.execute_command(start_idx, cmd)
+                        self.results.append(result)
+                        status = "✓" if not result.has_error else "✗"
+                        pbar.set_postfix_str(f"{status} {cmd[:40]}{'...' if len(cmd) > 40 else ''}")
+                        pbar.update(1)
+            else:
+                logger.info(f"\n{Fore.YELLOW}▶ Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
+                start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
+                for cmd in grouped['dependent']:
+                    result = self.execute_command(start_idx, cmd)
+                    self.results.append(result)
+                    status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
+                    logger.info(
+                        f"[{Fore.CYAN}{start_idx}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
+                        f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
+                    )
                 start_idx += 1
 
     def _analyze_security(self) -> List[SecurityIssue]:

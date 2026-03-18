@@ -196,38 +196,3 @@ class ReportGenerator:
             backup_result=backup_result,
             network_overview=network_overview
         )
-
-    def generate_all_reports(
-        self,
-        results: List[CommandResult],
-        security_issues: List[SecurityIssue],
-        router_info: RouterInfo,
-        backup_result: Optional[BackupResult] = None,
-        network_overview: Optional[NetworkOverview] = None
-    ) -> tuple:
-        """Generate all report formats (HTML, JSON, TXT, Markdown).
-
-        Args:
-            results: Command execution results
-            security_issues: Security issues found
-            router_info: Router information
-            backup_result: Backup operation result
-            network_overview: Pre-parsed network overview (optional)
-
-        Returns:
-            Tuple of (HTML path, JSON path, TXT path, Markdown path)
-        """
-        logger.info("Generating all report formats...")
-
-        html_path = self.generate_html_report(results, security_issues, router_info, backup_result, network_overview)
-        json_path = self.generate_json_report(results, security_issues, router_info, backup_result, network_overview)
-        txt_path = self.generate_txt_report(results, security_issues, router_info, backup_result, network_overview)
-        md_path = self.generate_markdown_report(results, security_issues, router_info, backup_result, network_overview)
-
-        logger.info("All reports generated successfully:")
-        logger.info(f"  HTML: {html_path}")
-        logger.info(f"  JSON: {json_path}")
-        logger.info(f"  TXT:  {txt_path}")
-        logger.info(f"  MD:   {md_path}")
-
-        return html_path, json_path, txt_path, md_path

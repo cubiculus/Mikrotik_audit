@@ -3,12 +3,11 @@
 import logging
 import hashlib
 import json
-from functools import lru_cache
 from pathlib import Path
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Optional
 from collections import OrderedDict
 
-from src.config import CommandResult, RouterInfo, SecurityIssue
+from src.config import CommandResult
 from src.models import NetworkOverview
 from src.parsers import (
     parse_interface_stats,
@@ -96,7 +95,7 @@ class DataParser:
     def build_network_overview(self, results: List[CommandResult]) -> NetworkOverview:
         """Aggregate network overview from all command results with caching."""
         overview = NetworkOverview()
-        
+
         # Index results by commands for efficient lookup
         results_by_command = {}
         for r in results:
@@ -153,8 +152,13 @@ class DataParser:
                 overview.interfaces = interfaces
                 overview.total_interfaces = iface_overview.total_interfaces
                 overview.active_interfaces = iface_overview.active_interfaces
+                # Convert dataclass objects to dictionaries for JSON serialization
+                interfaces_dict = [
+                    iface.__dict__ if hasattr(iface, '__dict__') else iface
+                    for iface in interfaces
+                ]
                 self._save_to_cache(cache_key, {
-                    'interfaces': interfaces,
+                    'interfaces': interfaces_dict,
                     'total_interfaces': iface_overview.total_interfaces,
                     'active_interfaces': iface_overview.active_interfaces
                 }, persist=True)
@@ -244,12 +248,12 @@ class DataParser:
             cache_key = self._get_cache_key(f"routing_rules:{routing_output}")
             cached = self._get_from_cache(cache_key)
             if cached:
-                from src.models import RoutingRule
-                overview.routing_rules = [RoutingRule(**r) for r in cached]
+                # parse_routing_rules returns List[dict], so restore as-is
+                overview.routing_rules = [r for r in cached]
                 logger.debug("Using cached routing rules")
             else:
                 overview.routing_rules = parse_routing_rules(results)
-                self._save_to_cache(cache_key, [r.__dict__ for r in overview.routing_rules], persist=True)
+                self._save_to_cache(cache_key, overview.routing_rules, persist=True)
 
         # Parse routes with caching
         routes_output = '\n'.join([r.stdout for r in results if '/ip route' in r.command])
@@ -394,67 +398,3 @@ class DataParser:
             overview.ping_results = parse_ping_results(ping_results_list)
 
         return overview
-    
-    @staticmethod
-    def parse_key_value(output: str) -> Dict[str, Any]:
-        """Parse simple key=value format"""
-        result = {}
-        for line in output.split('\n'):
-            if '=' in line:
-                key, value = line.split('=', 1)
-                result[key.strip()] = value.strip()
-        return result
-    
-    @staticmethod
-    def parse_security_findings(results: List[CommandResult]) -> List[SecurityIssue]:
-        """Parse security findings from various commands"""
-        issues: List[SecurityIssue] = []
-
-        for result in results:
-            if result.has_error:
-                continue
-
-            if result.command in ['/ip firewall filter print', '/interface print']:
-                # Check for disabled interfaces
-                if 'disabled=yes' in result.stdout.lower():
-                    issue = SecurityIssue(
-                        severity="medium",
-                        category="Configuration",
-                        description="Disabled network interface detected",
-                        recommendation="Review and enable necessary interfaces or remove unused ones"
-                    )
-                    issues.append(issue)
-
-        return issues
-    
-    @staticmethod
-    def analyze_network_health(router_info: RouterInfo) -> Dict[str, Any]:
-        """Analyze overall network health and provide recommendations"""
-        health_analysis = {
-            "overall_score": 0,
-            "issues": [],
-            "recommendations": []
-        }
-        
-        # Implement health analysis logic
-        # This is a placeholder for actual implementation
-        
-        return health_analysis
-
-    @staticmethod
-    def find_text_files(output_dir: str) -> dict[str, str]:
-        """Find all text files in output directory for CLI display"""
-        import os
-        text_files: dict[str, str] = {}
-
-        if not os.path.exists(output_dir):
-            return text_files
-
-        for root, dirs, files in os.walk(output_dir):
-            for file in files:
-                if file.endswith('.txt'):
-                    file_path = os.path.join(root, file)
-                    relative_path = os.path.relpath(file_path, output_dir)
-                    text_files[relative_path] = file_path
-        
-        return text_files

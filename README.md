@@ -25,7 +25,7 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 
 **Linux/Mac (recommended):**
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/main/scripts/quick_install.sh)
 ```
 
 **Windows:**
@@ -54,27 +54,29 @@ venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run audit with password
-python -m src.cli --ssh-user admin --ssh-pass your_password
+# Run audit with password (using environment variable)
+set MIKROTIK_PASSWORD=your_password && python -m src.cli --ssh-user admin
 
 # Run audit with SSH key
 python -m src.cli --ssh-user admin --ssh-key-file ~/.ssh/id_rsa
 
 # Run audit with redaction (hide sensitive data)
-python -m src.cli --ssh-user admin --ssh-pass your_password --redact
+set MIKROTIK_PASSWORD=your_password && python -m src.cli --ssh-user admin --redact
 ```
 
 ### 🎯 Quick Run
 
 **Windows:**
 ```powershell
-scripts\run_audit.bat --ssh-user admin --ssh-pass your_password
+scripts\run_audit.bat --ssh-user admin
 ```
 
 **Linux/Mac:**
 ```bash
-./scripts/run_audit.sh --ssh-user admin --ssh-pass your_password
+./scripts/run_audit.sh --ssh-user admin
 ```
+
+> **Note:** Set `MIKROTIK_PASSWORD` environment variable before running, or use SSH key authentication.
 
 ## 📸 Screenshots
 
@@ -123,21 +125,27 @@ Mikrotik_audit/
 | `--router-ip` | Router IP address or hostname | Yes | Auto-detect |
 | `--ssh-port` | SSH port | No | 22 |
 | `--ssh-user` | SSH username | Yes | - |
-| `--ssh-pass` | SSH password | Yes* | - |
 | `--ssh-key-file` | Path to SSH private key file | No* | - |
 | `--ssh-key-passphrase` | Passphrase for SSH key | No | - |
 | `--audit-level` | Audit detail level (Basic/Standard/Comprehensive) | No | Standard |
 | `--output-dir` | Output directory for reports | No | ./audit-reports |
 | `--skip-security` | Skip security analysis | No | False |
-| `--max-workers` | Maximum parallel workers | No | 5 |
+| `--max-workers` | Maximum parallel workers | No | 0 (auto) |
 | `--redact` | Redact sensitive data from reports | No | False |
+| `--connect-timeout` | SSH connection timeout in seconds | No | 30 |
+| `--command-timeout` | Command execution timeout in seconds | No | 120 |
+| `--no-backup` | Skip system backup | No | False |
+| `--verbose` | Enable verbose logging (DEBUG level) | No | False |
+| `--quiet` | Suppress non-essential output | No | False |
 
-\* Either `--ssh-pass` or `--ssh-key-file` must be provided.
+\* Either `MIKROTIK_PASSWORD` environment variable or `--ssh-key-file` must be provided.
 
 **Environment Variables:**
 - `MIKROTIK_PASSWORD` - SSH password
 - `MIKROTIK_SSH_KEY_FILE` - SSH key file path
 - `MIKROTIK_SSH_KEY_PASSPHRASE` - SSH key passphrase
+- `MIKROTIK_CONNECT_TIMEOUT` - SSH connection timeout (seconds)
+- `MIKROTIK_COMMAND_TIMEOUT` - Command execution timeout (seconds)
 
 ## 🔑 Features
 

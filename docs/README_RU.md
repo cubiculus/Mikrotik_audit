@@ -55,7 +55,7 @@
 
 **Linux/Mac (рекомендуется):**
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/main/scripts/quick_install.sh)
 ```
 
 **Windows:**
@@ -273,7 +273,7 @@ Mikrotik_audit/
 | `--audit-level` | Уровень аудита: Basic, Standard, Comprehensive | Нет | Standard |
 | `--output-dir` | Директория для отчетов | Нет | ./audit-reports |
 | `--skip-security` | Пропустить анализ безопасности | Нет | False |
-| `--max-workers` | Максимум параллельных потоков | Нет | 5 |
+| `--max-workers` | Максимум параллельных потоков | Нет | 0 (авто) |
 | `--redact` | Скрыть чувствительные данные в отчётах | Нет | False |
 
 \* Необходимо указать либо `--ssh-pass`, либо `--ssh-key-file`.

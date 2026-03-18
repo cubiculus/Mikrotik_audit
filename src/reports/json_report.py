@@ -60,12 +60,12 @@ class JSONReportGenerator(BaseReportGenerator):
                         for c in network_overview.containers
                     ],
                     "dns": {
-                        "servers": network_overview.dns.servers,
-                        "allow_remote": network_overview.dns.allow_remote,
-                        "use_doh": network_overview.dns.use_doh,
-                        "doh_server": network_overview.dns.doh_server,
-                        "cache_size": network_overview.dns.cache_size,
-                        "static_entries_count": len(network_overview.dns.static_entries),
+                        "servers": network_overview.dns.servers if network_overview.dns else [],
+                        "allow_remote": network_overview.dns.allow_remote if network_overview.dns else False,
+                        "use_doh": network_overview.dns.use_doh if network_overview.dns else False,
+                        "doh_server": network_overview.dns.doh_server if network_overview.dns else "",
+                        "cache_size": network_overview.dns.cache_size if network_overview.dns else 0,
+                        "static_entries_count": len(network_overview.dns.static_entries) if network_overview.dns else 0,
                     },
                     "mangle_rules": [
                         {
@@ -101,14 +101,14 @@ class JSONReportGenerator(BaseReportGenerator):
                     ],
                     "dhcp_leases": [
                         {
-                            "address": getattr(l, 'address', ''),
-                            "mac_address": getattr(l, 'mac_address', ''),
-                            "host_name": getattr(l, 'host_name', '') or getattr(l, 'client_hostname', ''),
-                            "address_lists": getattr(l, 'address_lists', ''),
-                            "dynamic": getattr(l, 'dynamic', False),
-                            "comment": getattr(l, 'comment', ''),
+                            "address": getattr(lease, 'address', ''),
+                            "mac_address": getattr(lease, 'mac_address', ''),
+                            "host_name": getattr(lease, 'host_name', '') or getattr(lease, 'client_hostname', ''),
+                            "address_lists": getattr(lease, 'address_lists', ''),
+                            "dynamic": getattr(lease, 'dynamic', False),
+                            "comment": getattr(lease, 'comment', ''),
                         }
-                        for l in network_overview.dhcp_leases
+                        for lease in network_overview.dhcp_leases
                     ],
                     "address_lists": {k: len(v) for k, v in network_overview.address_lists.items()},
                 },

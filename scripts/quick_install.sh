@@ -1,7 +1,7 @@
 #!/bin/bash
 # One-line installation script for MikroTik Audit Tool
-# Usage: bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh)
-# Or: curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh | bash
+# Usage: bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/main/scripts/quick_install.sh)
+# Or: curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/main/scripts/quick_install.sh | bash
 
 set -e
 

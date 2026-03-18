@@ -55,7 +55,7 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 
 **Linux/Mac (recommended):**
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/master/scripts/quick_install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/cubiculus/Mikrotik_audit/main/scripts/quick_install.sh)
 ```
 
 **Windows:**
@@ -274,7 +274,7 @@ Mikrotik_audit/
 | `--audit-level` | Audit level: Basic, Standard, Comprehensive | No | Standard |
 | `--output-dir` | Output directory for reports | No | ./audit-reports |
 | `--skip-security` | Skip security analysis | No | False |
-| `--max-workers` | Maximum parallel threads | No | 5 |
+| `--max-workers` | Maximum parallel threads | No | 0 (auto) |
 | `--redact` | Redact sensitive data from reports | No | False |
 
 \* Either `--ssh-pass` or `--ssh-key-file` must be provided.

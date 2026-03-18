@@ -3,7 +3,100 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from src.config import RouterConfig
-from src.ssh_handler import SSHHandler, SSHConnectionError, SSHConnectionPool
+from src.ssh_handler import SSHHandler, SSHConnectionError, SSHConnectionPool, _sanitize_command
+
+
+class TestSanitizeCommand:
+    """Tests for _sanitize_command function."""
+
+    def test_basic_command(self):
+        """Test basic command is preserved."""
+        command = "/system resource print"
+        result = _sanitize_command(command)
+        assert result == command
+
+    def test_negation_operator_preserved(self):
+        """Test that ! (negation operator) is preserved."""
+        command = '/ip route print detail where routing-mark!=""'
+        result = _sanitize_command(command)
+        assert result == command
+        assert '!=""' in result
+
+    def test_regex_match_operator_preserved(self):
+        """Test that ~ (regex match operator) is preserved."""
+        command = '/log print where topics~"firewall"'
+        result = _sanitize_command(command)
+        assert result == command
+        assert '~"firewall"' in result
+
+    def test_regex_match_with_veth(self):
+        """Test regex operator with veth pattern."""
+        command = '/ip address print where interface~"veth"'
+        result = _sanitize_command(command)
+        assert result == command
+        assert '~"veth"' in result
+
+    def test_pipe_removed(self):
+        """Test that pipe | is removed as dangerous."""
+        command = "/test | rm -rf"
+        result = _sanitize_command(command)
+        assert "|" not in result
+
+    def test_semicolon_removed(self):
+        """Test that semicolon ; is removed as dangerous."""
+        command = "/test ; rm -rf"
+        result = _sanitize_command(command)
+        assert ";" not in result
+
+    def test_ampersand_removed(self):
+        """Test that ampersand & is removed as dangerous."""
+        command = "/test & rm -rf"
+        result = _sanitize_command(command)
+        assert "&" not in result
+
+    def test_dollar_removed(self):
+        """Test that dollar sign $ is removed as dangerous."""
+        command = "/test $(rm -rf)"
+        result = _sanitize_command(command)
+        assert "$" not in result
+
+    def test_backtick_removed(self):
+        """Test that backtick ` is removed as dangerous."""
+        command = "/test `rm -rf`"
+        result = _sanitize_command(command)
+        assert "`" not in result
+
+    def test_brackets_removed(self):
+        """Test that parentheses {}() are removed as dangerous."""
+        command = "/test (rm -rf)"
+        result = _sanitize_command(command)
+        assert "(" not in result
+        assert ")" not in result
+
+    def test_redirect_removed(self):
+        """Test that redirect <> are removed as dangerous."""
+        command = "/test > /dev/null"
+        result = _sanitize_command(command)
+        assert ">" not in result
+
+    def test_backslash_removed(self):
+        """Test that backslash \\ is removed as dangerous."""
+        command = "/test \\x00"
+        result = _sanitize_command(command)
+        assert "\\" not in result
+
+    def test_allowed_characters(self):
+        """Test all allowed characters are preserved."""
+        command = '/interface print where name="ether1" and type~"ether"'
+        result = _sanitize_command(command)
+        assert result == command
+
+    def test_whitespace_stripped(self):
+        """Test leading/trailing whitespace is stripped."""
+        command = "  /system resource print  "
+        result = _sanitize_command(command)
+        assert result == "/system resource print"
+        assert result == result.strip()
 
 
 class TestSSHConnectionError:

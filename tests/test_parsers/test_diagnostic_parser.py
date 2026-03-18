@@ -88,6 +88,7 @@ Columns: TIME, BY, ACTION, CMD
         results = [CommandResult(index=0, command="/system history print", stdout=output)]
         entries = parse_history(results)
 
+        # Parser skips header line "Columns: TIME, BY, ACTION, CMD"
         assert len(entries) == 3
         assert entries[0].time == "12:30:45"
         assert entries[0].by == "admin"

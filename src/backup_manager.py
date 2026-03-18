@@ -91,22 +91,18 @@ class BackupManager:
 
                 return backup_result
 
-            # Check for success indicators (RouterOS may return different success messages)
-            success_indicators = [
-                "Configuration backup saved",
-                "Backup file created",
-                "Backup saved"
-            ]
+            # RouterOS v6/v7 doesn't output any success message - exit_status=0 indicates success
+            # Verify backup was created by checking if file exists
+            backup_filename = f"audit_backup_{backup_timestamp}.backup"
+            file_size = self._get_file_size(backup_filename)
 
-            # Backup created successfully
-            if any(indicator in output for indicator in success_indicators):
+            if file_size is not None and file_size > 0:
+                # Backup created successfully (file exists with non-zero size)
                 backup_result.status = "success"
-                backup_filename = f"audit_backup_{backup_timestamp}.backup"
+                backup_result.error_message = None
+                backup_result.file_size = file_size
 
-                # Get file size
-                backup_result.file_size = self._get_file_size(backup_filename)
-
-                logger.info(f"{Fore.GREEN}  ✓ Backup created successfully{Style.RESET_ALL}")
+                logger.info(f"{Fore.GREEN}  ✓ Backup created successfully ({file_size} bytes){Style.RESET_ALL}")
                 backup_result.file_name = backup_filename
 
                 # Download backup file
@@ -116,20 +112,33 @@ class BackupManager:
                 # Clean up from router (also handle permission errors)
                 self._cleanup_backup(backup_filename)
 
-            else:
-                # Unexpected output - try to extract error message
-                error_msg = "Backup command returned unexpected response"
-                if output:
-                    # Check for error keywords in output
-                    error_keywords = ["error", "failed", "cannot", "permission", "denied"]
-                    if any(kw in output.lower() for kw in error_keywords):
-                        error_msg = f"Backup failed: {output[:200]}"
-                    else:
-                        error_msg = f"Unexpected output: {output[:100]}"
-
-                backup_result.error_message = error_msg
+            elif exit_status == 0:
+                # Exit status is 0 but file not found - this is a failure (file should exist)
                 backup_result.status = "failed"
-                logger.error(f"Backup failed: {backup_result.error_message}")
+                backup_result.error_message = (
+                    f"Backup command returned exit_status=0 but file not found: {backup_filename}. "
+                    "Possible causes: file saved to different location, insufficient permissions, "
+                    "or RouterOS silent failure. Check router logs."
+                )
+                backup_result.file_name = backup_filename
+                logger.error(
+                    f"{Fore.RED}  ✗ Backup failed: exit_status=0 but file not found{Style.RESET_ALL}"
+                )
+                logger.error(f"  Expected file: {backup_filename}")
+
+            else:
+                # exit_status != 0 and file not found - definite failure
+                error_msg = stderr or output or "Backup command returned unexpected response"
+
+                # Check for error keywords in output
+                error_keywords = ["error", "failed", "cannot", "permission", "denied"]
+                if any(kw in error_msg.lower() for kw in error_keywords):
+                    backup_result.error_message = f"Backup failed: {error_msg[:200]}"
+                else:
+                    backup_result.error_message = f"Unexpected output: {error_msg[:100]}"
+
+                backup_result.status = "failed"
+                logger.error(f"{Fore.RED}  ✗ Backup failed: {backup_result.error_message}{Style.RESET_ALL}")
 
         except Exception as e:
             backup_result.status = "failed"
