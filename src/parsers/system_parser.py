@@ -11,15 +11,16 @@ logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=32)
-def _parse_value_with_unit(value_str: str) -> Tuple[int, str]:
-    """Parse value with unit (e.g., '1024KiB' -> (1024, 'KiB'))."""
-    match = re.match(r'(\d+)(\w*)', value_str)
+def _parse_value_with_unit(value_str: str) -> Tuple[float, str]:
+    """Parse value with unit (e.g., '1024KiB' -> (1024, 'KiB') or '66.8MiB' -> (66.8, 'MiB'))."""
+    # Support both integer and float values
+    match = re.match(r'(\d+(?:\.\d+)?)(\w*)', value_str)
     if match:
-        return int(match.group(1)), match.group(2)
-    return 0, ''
+        return float(match.group(1)), match.group(2)
+    return 0.0, ''
 
 
-def _parse_size_to_bytes(value: int, unit: str) -> int:
+def _parse_size_to_bytes(value: float, unit: str) -> int:
     """Convert size with unit to bytes."""
     multipliers = {
         '': 1,
@@ -29,7 +30,7 @@ def _parse_size_to_bytes(value: int, unit: str) -> int:
         'GiB': 1024 ** 3,
         'TiB': 1024 ** 4,
     }
-    return value * multipliers.get(unit, 1)
+    return int(value * multipliers.get(unit, 1))
 
 
 def parse_system_resource(results: List) -> SystemResource:
@@ -114,12 +115,14 @@ def parse_system_resource(results: List) -> SystemResource:
         elif key == 'total_memory' or key == 'total-memory':
             val, unit = _parse_value_with_unit(value)
             resource.total_memory = _parse_size_to_bytes(val, unit)
-        elif key == 'free_hdd' or key == 'free-hdd':
+        elif key == 'free_hdd' or key == 'free-hdd' or key == 'free_hdd_space' or key == 'free-hdd-space':
             val, unit = _parse_value_with_unit(value)
             resource.free_hdd = _parse_size_to_bytes(val, unit)
-        elif key == 'total_hdd' or key == 'total-hdd':
+            logger.debug(f"Parsed free-hdd: {val} {unit} = {resource.free_hdd} bytes")
+        elif key == 'total_hdd' or key == 'total-hdd' or key == 'total_hdd_space' or key == 'total-hdd-space':
             val, unit = _parse_value_with_unit(value)
             resource.total_hdd = _parse_size_to_bytes(val, unit)
+            logger.debug(f"Parsed total-hdd: {val} {unit} = {resource.total_hdd} bytes")
         elif key == 'write_sectors_since_reboot' or key == 'write-sectors-since-reboot':
             try:
                 resource.write_sectors_since_reboot = int(value)

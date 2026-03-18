@@ -434,6 +434,7 @@ class SecurityAnalyzer:
             List of security issues found
         """
         issues: List[SecurityIssue] = []
+        seen_issues = set()  # Track unique issues by (finding, command_pattern)
 
         for result in results:
             if result.has_error:
@@ -445,6 +446,15 @@ class SecurityAnalyzer:
                         try:
                             condition_func: Callable[[str], bool] = check["condition"]
                             if condition_func(result.stdout):
+                                # Create unique key for this issue
+                                issue_key = (check["finding"], rule["command"])
+
+                                # Skip if we've already reported this issue
+                                if issue_key in seen_issues:
+                                    continue
+
+                                seen_issues.add(issue_key)
+
                                 issue = SecurityIssue(
                                     severity=check["severity"],
                                     category=check["category"],

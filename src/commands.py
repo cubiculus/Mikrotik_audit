@@ -28,9 +28,14 @@ AUDIT_COMMANDS_STANDARD = [
     # Interfaces
     "/interface print detail",
     "/interface print stats",
+    "/interface list print detail",
+    "/interface list member print detail",
+    # Bridge
     "/interface bridge print detail",
     "/interface bridge port print detail",
     "/interface bridge vlan print detail",
+    "/interface bridge host print detail where local=no",
+    # Ethernet/VLAN
     "/interface ethernet print detail",
     "/interface vlan print detail",
     "/interface veth print detail",
@@ -45,8 +50,12 @@ AUDIT_COMMANDS_STANDARD = [
 
     # IP & Routing
     "/ip address print detail",
+    "/ip address print detail where disabled=no",
     "/ip route print detail",
+    "/ip route print detail where active=yes",
+    "/ip route print detail where active=no",
     '/ip route print detail where routing-mark!=""',
+    "/ip rule print detail",
     "/routing rule print detail",
     "/routing table print detail",
     "/ip arp print detail",
@@ -61,18 +70,37 @@ AUDIT_COMMANDS_STANDARD = [
     "/ip dhcp-server print",
     "/ip dhcp-server network print detail",
     "/ip dhcp-server lease print detail",
+    "/ip dhcp-server lease print detail where status=bound",
+    "/ip dhcp-server lease print detail where address-lists!=\"\"",
+    "/ip dhcp-option print detail",
 
-    # Firewall
+    # Firewall - Filter
     "/ip firewall filter print detail without-paging",
+    "/ip firewall filter print chain=input",
+    "/ip firewall filter print chain=forward",
+    "/ip firewall filter print chain=output",
+    # Firewall - NAT
     "/ip firewall nat print detail without-paging",
+    # Firewall - Mangle
     "/ip firewall mangle print detail without-paging",
+    "/ip firewall mangle print detail chain=prerouting where disabled=no",
+    "/ip firewall mangle print detail chain=forward where disabled=no",
+    "/ip firewall mangle print detail chain=postrouting where disabled=no",
+    # Firewall - Raw
     "/ip firewall raw print detail",
     # Firewall - Address Lists
     "/ip firewall address-list print detail",
-    "/ip firewall layer7-protocol print detail",
+    "/ip firewall address-list print detail where dynamic=no",
+    "/ip firewall address-list print detail where dynamic=yes",
+    # Firewall - Connections
     "/ip firewall connection tracking print",
     "/ip firewall connection print detail",
+    "/ip firewall connection print detail where connection-mark!=\"\"",
+    "/ip firewall connection print detail where routing-mark!=\"\"",
+    "/ip firewall connection print detail where connection-state=established",
+    # Firewall - Service Ports
     "/ip firewall service-port print",
+    "/ip firewall layer7-protocol print detail",
 
     # Services
     "/ip service print detail",
@@ -98,7 +126,7 @@ AUDIT_COMMANDS_STANDARD = [
 
     # Logs
     "/log print count=50",
-    '/log print where topics~"firewall" count=50',
+    '/log print where message~"firewall" count=50',
 
     # Connectivity Tests
     "/ping 8.8.8.8 count=5",
@@ -126,7 +154,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/system routerboard print",
     "/system license print",
     "/system certificate print detail",
-    "/system backup print",
+    "/system/backup/export",  # RouterOS v7 command (replaces /system backup print)
 
     # Users & Access
     "/user print detail",
@@ -140,9 +168,14 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     # Interfaces - General
     "/interface print detail",
     "/interface print stats",
+    "/interface list print detail",
+    "/interface list member print detail",
+    # Bridge
     "/interface bridge print detail",
     "/interface bridge port print detail",
     "/interface bridge vlan print",
+    "/interface bridge host print detail where local=no",
+    # Ethernet/VLAN
     "/interface ethernet print detail",
     "/interface vlan print detail",
     "/interface veth print detail",
@@ -174,6 +207,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # IP Addressing
     "/ip address print detail",
+    "/ip address print detail where disabled=no",
     "/ip address print where interface~\"veth\"",
     "/ip arp print detail",
     "/ip neighbor print detail",
@@ -181,9 +215,12 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # Routing
     "/ip route print detail",
+    "/ip route print detail where active=yes",
+    "/ip route print detail where active=no",
     "/ip route export",
     '/ip route print detail where routing-mark!=""',
     "/ip route print detail where gateway~\"veth\"",
+    "/ip rule print detail",
     "/routing rule print detail",
     "/ip route rule print detail",
     "/routing table print detail",
@@ -220,11 +257,18 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip dhcp-server print",
     "/ip dhcp-server network print detail",
     "/ip dhcp-server lease print detail",
+    "/ip dhcp-server lease print detail where status=bound",
+    "/ip dhcp-server lease print detail where address-lists!=\"\"",
     "/ip dhcp-server option print detail",
+    "/ip dhcp-option print detail",
     "/ip dhcp-server option sets print",
 
     # Firewall - Filter
     "/ip firewall filter print detail without-paging",
+    "/ip firewall filter print chain=input",
+    "/ip firewall filter print chain=forward",
+    "/ip firewall filter print chain=output",
+    "/ip firewall filter print chain=kid-control",
     "/ip firewall filter print detail where action=drop",
     '/ip firewall filter print detail where protocol=udp',
 
@@ -233,12 +277,18 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # Firewall - Mangle
     "/ip firewall mangle print detail without-paging",
+    "/ip firewall mangle print detail chain=prerouting where disabled=no",
+    "/ip firewall mangle print detail chain=forward where disabled=no",
+    "/ip firewall mangle print detail chain=postrouting where disabled=no",
     '/ip firewall mangle print detail where action~"mss"',
 
-    # Firewall - Raw & Other
+    # Firewall - Raw
     "/ip firewall raw print detail",
+
     # Firewall - Address Lists
     "/ip firewall address-list print detail",
+    "/ip firewall address-list print detail where dynamic=no",
+    "/ip firewall address-list print detail where dynamic=yes",
     "/ip firewall layer7-protocol print",
     "/ip firewall service-port print",
     "/ip firewall export verbose",
@@ -247,6 +297,9 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip firewall connection tracking print",
     "/ip firewall connection print detail",
     "/ip firewall connection print count-only",
+    "/ip firewall connection print detail where connection-mark!=\"\"",
+    "/ip firewall connection print detail where routing-mark!=\"\"",
+    "/ip firewall connection print detail where connection-state=established",
 
     # IPsec
     "/ip ipsec policy print detail",
@@ -289,9 +342,9 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/tool sniffer quick protocol=tcp duration=30",
 
     # Logs
-    '/log print where topics~"firewall" count=100',
-    '/log print where topics~"ovpn" count=50',
-    '/log print where topics~"wireguard" count=50',
+    '/log print where message~"firewall" count=100',
+    '/log print where message~"ovpn" count=50',
+    '/log print where message~"wireguard" count=50',
     "/log print follow=no count=500 without-paging",
 
     # Connectivity Tests

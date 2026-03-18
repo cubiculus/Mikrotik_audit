@@ -38,11 +38,13 @@ class TestCliPrompts:
                         mock_report.return_value = mock_report_instance
 
                         # Simulate user entering password when prompted
-                        result = runner.invoke(cli, ['audit', '--dry-run'], input='testpassword\n')
+                        # Note: --dry-run is used to avoid actual SSH connection,
+                        # but we need to test password prompt in real mode
+                        result = runner.invoke(cli, ['audit'], input='testpassword\n')
 
                         # Should have prompted for password
                         assert 'SSH Password' in result.output
-                        assert result.exit_code == 0 or result.exit_code == 1
+                        assert result.exit_code == 0
 
 
 class TestCliExitCodes:

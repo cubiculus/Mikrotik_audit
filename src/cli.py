@@ -209,8 +209,41 @@ def main(
         connect_timeout = connect_timeout or int(os.getenv("MIKROTIK_CONNECT_TIMEOUT", "30"))
         command_timeout = command_timeout or int(os.getenv("MIKROTIK_COMMAND_TIMEOUT", "120"))
 
-        # Get SSH password securely from environment or prompt
-        ssh_pass = os.getenv("MIKROTIK_PASSWORD")
+        # Handle dry-run mode early (no password or SSH connection needed)
+        if dry_run:
+            # For dry-run, use empty password if not provided
+            ssh_pass = os.getenv("MIKROTIK_PASSWORD", "")
+            if ssh_pass:
+                logger.debug(f"Password loaded from environment variable (length: {len(ssh_pass)})")
+            else:
+                logger.debug("No password provided (dry-run mode)")
+
+            config = AuditConfig(
+                router=RouterConfig(
+                    router_ip=router_ip,
+                    ssh_port=ssh_port,
+                    ssh_user=ssh_user,
+                    ssh_pass=ssh_pass,
+                    ssh_key_file=ssh_key_file,
+                    ssh_key_passphrase=ssh_key_passphrase,
+                    connect_timeout=connect_timeout,
+                    command_timeout=command_timeout,
+                    timeout_per_command=timeout_per_command,
+                ),
+                audit_level=AuditLevel(audit_level),
+                output_dir=output_dir,
+                skip_security_check=skip_security,
+                max_workers=max_workers,
+                redact_sensitive=redact,
+                output_formats=[f.strip().lower() for f in output_formats.split(',')],
+                enable_cve_check=not no_cve_check,
+                show_progress_bar=not no_progress_bar,
+            )
+            print_dry_run(config)
+            sys.exit(0)
+
+        # Get SSH password securely from environment or prompt (not needed for dry-run)
+        ssh_pass = os.getenv("MIKROTIK_PASSWORD")  # type: ignore[assignment]
         if ssh_pass:
             logger.debug(f"Password loaded from environment variable (length: {len(ssh_pass)})")
         else:
@@ -289,18 +322,13 @@ def main(
                 ), err=True)
                 sys.exit(1)
 
-        # Warn about sensitive data if not redacting
+        # Warn about sensitive data if not redacting (not needed for dry-run)
         if not redact and not dry_run:
             click.echo(click.style(
                 "WARNING: Report will include PPP secrets, Hotspot users, and serial numbers. "
                 "Use --redact to mask sensitive data.",
                 fg='yellow'
             ), err=True)
-
-        # Handle dry-run mode
-        if dry_run:
-            print_dry_run(config)
-            sys.exit(0)
 
         # Run audit
         auditor = MikroTikAuditor(config)
