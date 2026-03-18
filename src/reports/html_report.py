@@ -347,13 +347,40 @@ class HTMLReportGenerator(BaseReportGenerator):
             html += "</div>"
             return html
         else:
+            # Определяем тип ошибки и формируем понятное сообщение
+            error_msg = backup_result.error_message or "Unknown error"
+            icon = "❌"
+            title = "Backup Failed"
+
+            # Извлекаем краткую причину из сообщения
+            short_reason = ""
+            recommendation = ""
+
+            if "permission" in error_msg.lower() or "not enough permissions" in error_msg.lower():
+                short_reason = "Недостаточно прав для создания бэкапа"
+                recommendation = "Требуется пользователь с правами 'write' или 'full'"
+                icon = "🔒"
+            elif "sftp" in error_msg.lower() or "not supported" in error_msg.lower():
+                short_reason = "SFTP не поддерживается на роутере"
+                recommendation = "Скачайте бэкап вручную через WinBox"
+                icon = "📁"
+            elif "exit status" in error_msg.lower() or "not found" in error_msg.lower():
+                short_reason = "Бэкап не был создан (ошибка RouterOS)"
+                recommendation = "Проверьте права доступа и место на диске"
+                icon = "⚠️"
+            else:
+                short_reason = error_msg[:150]  # Обрезаем длинные сообщения
+
             html = "<div style='background:#fee2e2;padding:20px;border-radius:8px;border-left:4px solid #ef4444'>"
-            html += "<h3 style='margin:0;color:#991b1b'>❌ Backup Failed</h3>"
+            html += f"<h3 style='margin:0;color:#991b1b'>{icon} {title}</h3>"
             html += "<p style='margin:5px 0;color:#991b1b'>"
             html += f"<strong>Timestamp:</strong> {backup_result.timestamp}<br>"
-            html += f"<strong>Error:</strong> {backup_result.error_message or 'Unknown error'}<br>"
-            html += "<em>Note: This does not affect the audit results. Only the backup file was not created.</em>"
-            html += "</p></div>"
+            html += f"<strong>Причина:</strong> {short_reason}"
+            if recommendation:
+                html += f"<br><strong>Рекомендация:</strong> {recommendation}"
+            html += "</p>"
+            html += "<p style='margin-top:10px;font-size:0.9em;color:#666'><em>ⓘ Аудит безопасности выполнен успешно</em></p>"
+            html += "</div>"
             return html
 
     def _create_containers_section(self, overview: Optional[NetworkOverview]) -> str:
