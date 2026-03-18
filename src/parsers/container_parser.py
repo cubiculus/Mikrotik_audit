@@ -71,7 +71,7 @@ def parse_containers(results: List) -> Tuple[List[Container], NetworkOverview]:
         if header_match:
             # Check if this line has container parameters (name=, remote-image=, etc.)
             rest_of_line = header_match.group(3).strip() if header_match.group(3) else ''
-            
+
             # Skip lines that don't have container data (just index with flags)
             if not rest_of_line or '=' not in rest_of_line:
                 i += 1
@@ -95,15 +95,23 @@ def parse_containers(results: List) -> Tuple[List[Container], NetworkOverview]:
             # Parse container parameters from following lines
             j = i + 1
             while j < total_lines:
-                next_line = lines[j].strip()
+                next_line = lines[j]
+                next_line_stripped = next_line.strip()
 
-                # New container (starts with number)
-                if NEW_CONTAINER_PATTERN.match(next_line) and '=' not in next_line:
-                    break
+                # New container: line starts with single space + number
+                # Continuation lines start with multiple spaces (indentation)
+                if next_line.startswith(' ') and not next_line.startswith('   '):
+                    # Could be a new container (single space indent)
+                    if NEW_CONTAINER_PATTERN.match(next_line_stripped):
+                        break
+                elif not next_line.startswith(' '):
+                    # No indent at all - could be new container
+                    if NEW_CONTAINER_PATTERN.match(next_line_stripped):
+                        break
 
-                # Parse parameters (indented or containing =)
-                if INDENTED_PATTERN.match(lines[j]) or ('=' in next_line and not NEW_CONTAINER_PATTERN.match(next_line)):
-                    for part in next_line.split():
+                # Parse parameters (indented lines with =)
+                if '=' in next_line_stripped:
+                    for part in next_line_stripped.split():
                         key, value = _parse_container_param_cached(part)
                         if key and value:
                             _set_container_field(current_container, key, value)

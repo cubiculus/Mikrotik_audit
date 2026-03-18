@@ -85,13 +85,23 @@ class TestContainerParserPatterns:
         """Test container header pattern matching."""
         match = CONTAINER_HEADER_PATTERN.match("0  DRSI  name='test'")
         assert match is not None
-        assert match.group(1) == "DRSI"
+        assert match.group(1) == "0"  # index
+        assert match.group(2) == "DRSI"  # flags
+        assert match.group(3).strip() == "name='test'"  # rest of line
 
     def test_container_header_pattern_running(self):
         """Test pattern with running container flags."""
         match = CONTAINER_HEADER_PATTERN.match("1  R  name='running-container'")
         assert match is not None
-        assert match.group(1) == "R"
+        assert match.group(1) == "1"  # index
+        assert match.group(2) == "R"  # flags
+
+    def test_container_header_pattern_stopped(self):
+        """Test pattern with stopped container (no flags)."""
+        match = CONTAINER_HEADER_PATTERN.match("0    name='stopped-container'")
+        assert match is not None
+        assert match.group(1) == "0"  # index
+        assert match.group(2) == ""  # no flags
 
     def test_container_header_pattern_no_match(self):
         """Test pattern with non-container line."""
