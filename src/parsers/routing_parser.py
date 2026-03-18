@@ -27,11 +27,39 @@ ROUTE_KNOWN_FIELDS = {
 }
 
 
+def _split_respecting_quotes(line: str) -> list:
+    """Split line into parts, respecting quoted values.
+
+    Example:
+        'dst-address=1.1.1.1 comment="To office"'
+        -> ['dst-address=1.1.1.1', 'comment="To office"']
+    """
+    parts = []
+    current = []
+    in_quotes = False
+
+    for char in line:
+        if char == '"':
+            in_quotes = not in_quotes
+            current.append(char)
+        elif char.isspace() and not in_quotes:
+            if current:
+                parts.append(''.join(current))
+                current = []
+        else:
+            current.append(char)
+
+    if current:
+        parts.append(''.join(current))
+
+    return parts
+
+
 @lru_cache(maxsize=256)
 def _parse_route_line_cached(line: str) -> Dict[str, str]:
     """Кэшированная функция для парсинга строки маршрута.
 
-    Handles RouterOS v7 format with status prefixes.
+    Handles RouterOS v7 format with status prefixes and quoted values.
     """
     # Remove leading whitespace from RouterOS v7 format
     line = line.lstrip()
@@ -47,22 +75,23 @@ def _parse_route_line_cached(line: str) -> Dict[str, str]:
                      'RAc', 'RAo', 'RAs', 'RAi', 'RAv', 'RD', 'RC', 'RH', 'RI', 'RA',
                      'H', 'B', 'C', 'O', 'I', 'U', 'D']
 
-    # Split the line and find the first key that contains '=' and is not a status prefix
-    parts = line.split()
+    # Smart split that respects quoted values
+    parts = _split_respecting_quotes(line)
+
     for part in parts:
-        if '=' in part and part.split('=', 1)[0] not in status_prefixes:
-            # Found a valid key=value pair
+        if '=' in part:
             k, v = part.split('=', 1)
-            route_dict[k] = v
+            # Skip status prefixes
+            if k not in status_prefixes:
+                route_dict[k] = v
+                break
 
-            # Look for more values in remaining parts
-            remaining_idx = parts.index(part) + 1
-            for remaining_part in parts[remaining_idx:]:
-                if '=' in remaining_part:
-                    k, v = remaining_part.split('=', 1)
-                    route_dict[k] = v
-
-            break
+    # Parse remaining parts
+    for part in parts:
+        if '=' in part:
+            k, v = part.split('=', 1)
+            if k not in status_prefixes:
+                route_dict[k] = v
 
     return route_dict
 
@@ -121,7 +150,7 @@ def parse_routing_rules(results: List) -> List[dict]:
 def parse_dns_config(results: List) -> DNSInfo:
     """Parse DNS configuration."""
     dns_info = DNSInfo()
-    
+
     for r in results:
         if r.command.startswith(COMMAND_DNS_PATTERN):
             for line in r.stdout.split('\n'):
@@ -130,27 +159,27 @@ def parse_dns_config(results: List) -> DNSInfo:
                 if servers_match:
                     servers = servers_match.group(1).strip()
                     dns_info.servers = [s.strip() for s in servers.split(',') if s.strip()]
-                
+
                 # Parse use-doh
                 use_doh_match = USE_DOH_PATTERN.search(line)
                 if use_doh_match:
                     dns_info.use_doh = _safe_bool(use_doh_match.group(1))
-                
+
                 # Parse doh-server
                 doh_server_match = DOH_SERVER_PATTERN.search(line)
                 if doh_server_match:
                     dns_info.doh_server = doh_server_match.group(1).strip()
-                
+
                 # Parse allow-remote-requests
                 allow_remote_match = ALLOW_REMOTE_PATTERN.search(line)
                 if allow_remote_match:
                     dns_info.allow_remote = _safe_bool(allow_remote_match.group(1))
-                
+
                 # Parse cache-size
                 cache_size_match = CACHE_SIZE_PATTERN.search(line)
                 if cache_size_match:
                     dns_info.cache_size = _safe_int(cache_size_match.group(1))
-        
+
         if r.command.startswith(COMMAND_DNS_STATIC_PATTERN):
             # Parse static DNS entries
             for line in r.stdout.split('\n'):
@@ -158,5 +187,5 @@ def parse_dns_config(results: List) -> DNSInfo:
                     # Reuse the smart parsing function
                     entry = _parse_route_line_cached(line)
                     dns_info.static_entries.append(entry)
-    
+
     return dns_info

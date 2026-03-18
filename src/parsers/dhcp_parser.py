@@ -137,7 +137,7 @@ def parse_dhcp_leases(results: List) -> Tuple[List[DHCPLease], NetworkOverview]:
                 logger.debug(f"Parsed DHCP lease #{entry_num}: {lease.address} -> {lease.lease_status} (flags: '{flags.strip()}')")
 
         overview.dhcp_leases_count = len(leases)
-        overview.dhcp_active_leases = len([l for l in leases if l.lease_status == "Dynamic" and l.expires_after != "never"])
+        overview.dhcp_active_leases = len([lease for lease in leases if lease.lease_status == "Dynamic" and lease.expires_after != "never"])
 
     except Exception as e:
         logger.error(f"Error parsing DHCP leases: {e}", exc_info=True)
@@ -150,14 +150,14 @@ def parse_dhcp_leases(results: List) -> Tuple[List[DHCPLease], NetworkOverview]:
 def _parse_lease_data_cached(entry_str: str) -> dict:
     """Кэшированная версия парсинга данных аренды с поддержкой кавычек."""
     lease_data = {}
-    
+
     # Используем shlex.split для корректной обработки значений в кавычках
     try:
         parts = shlex.split(entry_str)
     except ValueError:
         # Если shlex не справился (например, незакрытые кавычки), используем обычный split
         parts = entry_str.split()
-    
+
     for part in parts:
         if '=' in part:
             try:

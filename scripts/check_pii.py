@@ -280,7 +280,7 @@ def main() -> int:
     files_to_scan = [f for f in files_to_scan if not should_skip_file(f)]
 
     # Use UTF-8 encoding for Windows console compatibility
-    if sys.platform == 'win32':
+    if sys.platform == 'win32' and hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
 
     print(f"{CYAN}{BOLD}MikroTik PII Scanner{RESET} "

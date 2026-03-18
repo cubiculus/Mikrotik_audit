@@ -110,7 +110,7 @@ class TXTReportGenerator(BaseReportGenerator):
                 lines.append("-" * 80)
 
                 if r.has_error:
-                    lines.append(f"STATUS: FAILED")
+                    lines.append("STATUS: FAILED")
                     lines.append(f"ERROR TYPE: {r.error_type or 'Unknown'}")
                     lines.append(f"ERROR MESSAGE: {r.error_message or 'N/A'}")
                     lines.append(f"EXIT STATUS: {r.exit_status}")
@@ -120,7 +120,7 @@ class TXTReportGenerator(BaseReportGenerator):
                         clean_stderr = '\n'.join(line for line in r.stderr.split('\n') if line.strip())
                         lines.append(clean_stderr)
                 else:
-                    lines.append(f"STATUS: SUCCESS")
+                    lines.append("STATUS: SUCCESS")
                     lines.append(f"DURATION: {r.duration:.2f}s")
 
                 lines.append("")

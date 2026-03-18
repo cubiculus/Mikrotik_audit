@@ -64,13 +64,13 @@
 def execute_command(self, command: str) -> Tuple[int, str, str]:
     """
     Выполнить команду на роутере.
-    
+
     Args:
         command: Команда для выполнения
-        
+
     Returns:
         Кортеж (exit_status, stdout, stderr)
-        
+
     Raises:
         SSHConnectionError: Если соединение не удалось
     """
@@ -111,7 +111,7 @@ def test_valid_port_range(self):
     """Test valid SSH port values."""
     config = RouterConfig(ssh_port=22)
     assert config.ssh_port == 22
-    
+
     config = RouterConfig(ssh_port=65535)
     assert config.ssh_port == 65535
 ```
