@@ -38,6 +38,7 @@ from src.parsers import (
     parse_firewall_logs,
     parse_history,
     parse_ping_results,
+    parse_disks,
 )
 
 logger = logging.getLogger(__name__)
@@ -311,6 +312,11 @@ class DataParser:
         resource_results = [r for r in results if r.command == '/system resource print']
         if resource_results:
             overview.system_resource = parse_system_resource(resource_results)
+
+        # Parse disks
+        disk_results = [r for r in results if r.command.startswith('/disk')]
+        if disk_results:
+            overview.disks = parse_disks(disk_results)
 
         # Parse system health
         health_results = [r for r in results if r.command == '/system health print']

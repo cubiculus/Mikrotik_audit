@@ -5,7 +5,7 @@ import re
 from typing import List, Tuple, Optional
 from functools import lru_cache
 
-from src.models import SystemResource, SystemHealth
+from src.models import SystemResource, SystemHealth, Disk
 
 logger = logging.getLogger(__name__)
 
@@ -354,3 +354,89 @@ def parse_system_package_update(results: List) -> dict:
                     update_info['scheduled'] = value.lower() == 'true' or value.lower() == 'yes'
 
     return update_info
+
+
+def parse_disks(results: List) -> List[Disk]:
+    """
+    Parse disk information from /disk print.
+
+    RouterOS v7 format:
+     Flags: R - REMOVABLE
+     0 R name="usb1" type="usb" path="/usb1" total-size=29.8GiB free-size=22.1GiB
+    """
+    disks: List[Disk] = []
+    disk_names_seen: set = set()
+
+    if not results:
+        logger.debug("No disk data available")
+        return disks
+
+    for result in results:
+        if result.has_error:
+            continue
+
+        # Skip export output - it doesn't contain physical disk info
+        if '/export' in result.command:
+            continue
+
+        output = result.stdout
+
+        for line in output.split('\n'):
+            line = line.strip()
+            if not line or line.startswith('Flags:'):
+                continue
+
+            # Must have name= and total-size= to be a valid disk entry
+            if 'name=' not in line or 'total-size=' not in line:
+                continue
+
+            disk_data = {}
+
+            # Extract name
+            name_match = re.search(r'name=["\']?([^"\'\s]+)["\']?', line)
+            if name_match:
+                disk_name = name_match.group(1)
+                # Skip if already processed this disk
+                if disk_name in disk_names_seen:
+                    continue
+                disk_names_seen.add(disk_name)
+                disk_data['name'] = disk_name
+
+            # Extract type
+            type_match = re.search(r'type=["\']?([^"\'\s]+)["\']?', line)
+            if type_match:
+                disk_data['type'] = type_match.group(1)
+
+            # Extract path
+            path_match = re.search(r'path=["\']?([^"\'\s]+)["\']?', line)
+            if path_match:
+                disk_data['path'] = path_match.group(1)
+
+            # Extract total-size with unit
+            total_match = re.search(r'total-size=(\d+(?:\.\d+)?)(\w*)', line)
+            if total_match:
+                disk_data['total_size'] = _parse_size_to_bytes(float(total_match.group(1)), total_match.group(2))
+
+            # Extract free-size with unit
+            free_match = re.search(r'free-size=(\d+(?:\.\d+)?)(\w*)', line)
+            if free_match:
+                disk_data['free_size'] = _parse_size_to_bytes(float(free_match.group(1)), free_match.group(2))
+
+            # Create Disk object if we have at least name and total size
+            total_size_val = disk_data.get('total_size', 0)
+            if disk_data.get('name') and isinstance(total_size_val, int) and total_size_val > 0:
+                disk = Disk(
+                    name=disk_data.get('name', ''),
+                    type=disk_data.get('type', ''),
+                    path=disk_data.get('path', ''),
+                    total_size=total_size_val,
+                    free_size=disk_data.get('free_size', 0)
+                )
+
+                # Calculate used percent
+                if disk.total_size > 0:
+                    disk.used_percent = ((disk.total_size - disk.free_size) / disk.total_size) * 100
+
+                disks.append(disk)
+
+    return disks

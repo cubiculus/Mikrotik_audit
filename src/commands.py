@@ -162,8 +162,8 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/user ssh-keys print",
 
     # Disk & Files
-    "/disk print detail",
-    "/file print detail",
+    "/disk print",
+    "/file print",
 
     # Interfaces - General
     "/interface print detail",

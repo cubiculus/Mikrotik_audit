@@ -160,6 +160,17 @@ class Container:
 
 
 @dataclass
+class Disk:
+    """Disk information"""
+    name: str = ""
+    type: str = ""
+    path: str = ""
+    total_size: int = 0  # in bytes
+    free_size: int = 0  # in bytes
+    used_percent: float = 0.0
+
+
+@dataclass
 class NetworkOverview:
     """Network overview statistics"""
     total_interfaces: int = 0
@@ -186,6 +197,7 @@ class NetworkOverview:
     # System resources
     system_resource: Any = None
     system_health: Any = None
+    disks: list = field(default_factory=list)
     packages: list = field(default_factory=list)
     package_update: dict = field(default_factory=dict)
     # Services

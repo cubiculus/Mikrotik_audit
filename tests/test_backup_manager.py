@@ -42,7 +42,7 @@ class TestBackupSuccess:
                     mock_cleanup.assert_called_once_with("audit_backup_20260318_120000.backup")
 
     def test_backup_failure_on_exit_status_zero_but_file_not_found(self):
-        """Test that exit_status=0 with missing file results in skipped status (RouterOS v7 limitation)."""
+        """Test that exit_status=0 with missing file results in failed status."""
         # Arrange
         mock_ssh = MagicMock()
         backup_manager = BackupManager(mock_ssh)
@@ -58,10 +58,11 @@ class TestBackupSuccess:
                 timestamp="20260318_120000"
             )
 
-            # Assert - RouterOS v7 limitation: treated as skipped rather than failed
-            assert result.status == "skipped"
+            # Assert - command succeeded but file not found = failed (not skipped)
+            assert result.status == "failed"
             assert result.file_name == "audit_backup_20260318_120000.backup"
-            assert "RouterOS v7" in result.error_message or "backup" in result.error_message.lower()
+            assert "exit_status=0 but file not found" in result.error_message
+            assert "storage" in result.error_message.lower() or "storage" in result.error_message.lower()
 
 
 class TestBackupPermissionDenied:

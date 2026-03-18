@@ -850,6 +850,20 @@ class HTMLReportGenerator(BaseReportGenerator):
                 </div>
             ''')
 
+            # USB disks info
+            if overview.disks:
+                for disk in overview.disks:
+                    total_mb = disk.total_size // (1024 * 1024) if disk.total_size > 0 else 0
+                    free_mb = disk.free_size // (1024 * 1024) if disk.free_size > 0 else 0
+                    disk_type_icon = "💾" if disk.type == "usb" else "📀"
+
+                    html_parts.append(f'''
+                        <div class="info-item">
+                            <span class="info-label">USB Disk {disk.name}:</span>
+                            <span class="info-value">{disk_type_icon} {free_mb}MB / {total_mb}MB ({disk.used_percent:.1f}% used)</span>
+                        </div>
+                    ''')
+
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">Uptime:</span>
