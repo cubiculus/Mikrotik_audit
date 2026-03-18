@@ -50,28 +50,46 @@ class BackupManager:
         try:
             logger.info(f"{Fore.CYAN}  Creating system backup...{Style.RESET_ALL}")
 
-            # Create backup (RouterOS v7 syntax: /system/backup/save)
-            # Using dont-encrypt=yes to avoid encryption issues
-            # Try without file-path first (uses default location)
+            # RouterOS CLI syntax (space-separated, works on v6 and v7 via SSH).
+            # No password = not encrypted backup by default on most versions.  # noqa: PII
+            # dont-encrypt=yes is only needed on RouterOS 7.4+ where encryption
+            # may be required by policy — tried as fallback below.
             exit_status, output, stderr = self.ssh.execute_command(
-                f"/system/backup/save name=audit_backup_{backup_timestamp} dont-encrypt=yes"
+                f"/system backup save name=audit_backup_{backup_timestamp}"
             )
 
-            # Log raw output for debugging
-            logger.debug(f"Backup command result: exit_status={exit_status}, output='{output[:200] if output else 'empty'}', stderr='{stderr[:200] if stderr else 'empty'}'")
+            logger.debug(
+                f"Backup command result: exit_status={exit_status}, "
+                f"output='{output[:200] if output else 'empty'}', "
+                f"stderr='{stderr[:200] if stderr else 'empty'}'"
+            )
 
-            # If exit_status is 0 but output contains error text, treat as error
-            if exit_status == 0 and output:
-                output_lower = output.lower()
-                if 'error' in output_lower or 'failed' in output_lower or 'cannot' in output_lower:
-                    exit_status = 1
-                    stderr = output
+            # RouterOS 7.4+ may require dont-encrypt=yes when encryption policy
+            # is set. Detect and retry once with the explicit flag.
+            if exit_status != 0:
+                error_text = (stderr or output or "").lower()
+                needs_encrypt_flag = (
+                    "encrypt" in error_text
+                    or "password" in error_text
+                    or "dont-encrypt" in error_text
+                )
+                if needs_encrypt_flag:
+                    logger.info(
+                        f"{Fore.YELLOW}  Retrying backup with dont-encrypt=yes "
+                        f"(RouterOS 7.4+ policy){Style.RESET_ALL}"
+                    )
+                    exit_status, output, stderr = self.ssh.execute_command(
+                        f"/system backup save name=audit_backup_{backup_timestamp} dont-encrypt=yes"
+                    )
+                    logger.debug(
+                        f"Retry result: exit_status={exit_status}, "
+                        f"output='{output[:200] if output else 'empty'}'"
+                    )
 
             # Check for permission denied or other errors
             if exit_status != 0:
-                error_msg = stderr or output
+                error_msg = stderr or output or ""
 
-                # Check for common permission errors
                 permission_errors = [
                     "permission denied",
                     "insufficient privileges",
@@ -80,7 +98,7 @@ class BackupManager:
                     "failure: no such item or access denied",
                     "no such user group",
                     "can not do that",
-                    "not enough permissions",  # RouterOS specific error message
+                    "not enough permissions",
                 ]
 
                 if any(err in error_msg.lower() for err in permission_errors):
@@ -103,57 +121,40 @@ class BackupManager:
 
                 return backup_result
 
-            # RouterOS v6/v7 doesn't output any success message - exit_status=0 indicates success
-            # Verify backup was created by checking if file exists
+            # exit_status == 0: RouterOS doesn't print a success message.
+            # Verify the file actually exists on the router.
             backup_filename = f"audit_backup_{backup_timestamp}.backup"
             file_size = self._get_file_size(backup_filename)
 
             if file_size is not None and file_size > 0:
-                # Backup created successfully (file exists with non-zero size)
+                # File confirmed on router — backup successful.
                 backup_result.status = "success"
                 backup_result.error_message = None
                 backup_result.file_size = file_size
-
-                logger.info(f"{Fore.GREEN}  ✓ Backup created successfully ({file_size} bytes){Style.RESET_ALL}")
                 backup_result.file_name = backup_filename
 
-                # Download backup file
+                logger.info(
+                    f"{Fore.GREEN}  ✓ Backup created successfully ({file_size} bytes){Style.RESET_ALL}"
+                )
+
                 if output_dir:
                     self._download_backup(backup_filename, output_dir, backup_result)
 
-                # Clean up from router (also handle permission errors)
                 self._cleanup_backup(backup_filename)
 
-            elif exit_status == 0:
-                # Exit status is 0 but file not found - RouterOS v7 may store backups differently
-                # or there may be no storage available. Treat as skipped rather than failed.
-                backup_result.status = "skipped"
-                backup_result.error_message = (
-                    "RouterOS v7 does not support automatic backup download. "
-                    "Backup may have been created but cannot be verified or downloaded automatically. "
-                    "Manual backup via WinBox or Terminal is recommended."
-                )
-                backup_result.file_name = backup_filename
-                logger.warning(
-                    f"{Fore.YELLOW}  ⚠ Backup status unknown: RouterOS v7 limitation{Style.RESET_ALL}"
-                )
-                logger.warning(
-                    f"{Fore.YELLOW}  (Manual backup recommended via WinBox: Files → Backup){Style.RESET_ALL}"
-                )
-
             else:
-                # exit_status != 0 and file not found - definite failure
-                error_msg = stderr or output or "Backup command returned unexpected response"
-
-                # Check for error keywords in output
-                error_keywords = ["error", "failed", "cannot", "permission", "denied"]
-                if any(kw in error_msg.lower() for kw in error_keywords):
-                    backup_result.error_message = f"Backup failed: {error_msg[:200]}"
-                else:
-                    backup_result.error_message = f"Unexpected output: {error_msg[:100]}"
-
+                # exit_status=0 but file missing — command appeared to succeed
+                # but no file was written (storage full, wrong path, etc.).
                 backup_result.status = "failed"
-                logger.error(f"{Fore.RED}  ✗ Backup failed: {backup_result.error_message}{Style.RESET_ALL}")
+                backup_result.file_name = backup_filename
+                backup_result.error_message = (
+                    f"Backup command returned exit_status=0 but file not found: {backup_filename}. "
+                    "Possible causes: insufficient storage on router, or silent RouterOS error. "
+                    "Check available space with '/disk print' and router logs."
+                )
+                logger.error(
+                    f"{Fore.RED}  ✗ Backup failed: command succeeded but file not found{Style.RESET_ALL}"
+                )
 
         except Exception as e:
             backup_result.status = "failed"
@@ -183,22 +184,18 @@ class BackupManager:
         output_dir: Path,
         backup_result: BackupResult
     ):
-        """Download backup file from router."""
+        """Download backup file from router via SFTP."""
         logger.info(f"{Fore.CYAN}  Downloading backup file to {output_dir}...{Style.RESET_ALL}")
 
         try:
             with self.ssh.connection_pool.get_connection() as ssh_client:
-                # Check if SFTP is supported
                 transport = ssh_client.get_transport()
                 if not transport:
                     raise Exception("SSH transport not available")
 
-                # Verify SFTP subsystem is available
                 if not transport.is_active():
                     raise Exception("SSH transport is not active")
 
-                # Open SFTP session
-                sftp = None
                 try:
                     sftp = ssh_client.open_sftp()
                     logger.debug("SFTP session established successfully")
@@ -210,29 +207,26 @@ class BackupManager:
                         f"Error: {sftp_error}"
                     )
 
-                # Find backup file (case-insensitive)
+                # Find backup file (case-insensitive match)
                 try:
                     remote_files = sftp.listdir('.')
                     matching_files = [f for f in remote_files if filename.lower() in f.lower()]
                     if matching_files:
                         filename = matching_files[0]
-                        logger.info(f"Matching files: {matching_files}")
+                        logger.info(f"Found remote file: {filename}")
                 except Exception as list_err:
                     logger.warning(f"Could not list remote files: {list_err}")
 
-                remote_path = filename
                 local_path = output_dir / filename
-
-                # Create local directory if needed
                 output_dir.mkdir(parents=True, exist_ok=True)
 
-                # Download file
-                sftp.get(remote_path, str(local_path))
+                sftp.get(filename, str(local_path))
                 sftp.close()
 
-                # Verify file exists
                 if local_path.exists():
-                    logger.info(f"{Fore.GREEN}  ✓ Backup downloaded successfully{Style.RESET_ALL}: {local_path.name}")
+                    logger.info(
+                        f"{Fore.GREEN}  ✓ Backup downloaded successfully{Style.RESET_ALL}: {local_path.name}"
+                    )
                     backup_result.local_path = str(local_path)
                     backup_result.file_size = local_path.stat().st_size
                 else:
@@ -247,22 +241,23 @@ class BackupManager:
         """Delete backup file from router. Handles permission errors gracefully."""
         logger.info("Cleaning up backup file from router...")
 
-        # Используем безопасный синтаксис с экранированием имени
-        exit_status, output, stderr = self.ssh.execute_command(f'/file remove [find name="{filename}"]')
+        exit_status, output, stderr = self.ssh.execute_command(
+            f'/file remove [find name="{filename}"]'
+        )
 
         if exit_status == 0:
             logger.info(f"✓ Backup file removed from router: {filename}")
         else:
-            # Check if it's a permission error
             error_msg = stderr or output
             permission_errors = [
                 "permission denied",
                 "insufficient privileges",
                 "no write permission",
-                "access denied"
+                "access denied",
             ]
-
             if any(err in error_msg.lower() for err in permission_errors):
                 logger.debug(f"Cleanup skipped (permission denied): {filename}")
             else:
-                logger.warning(f"✗ Failed to remove backup file from router: {filename} - {error_msg}")
+                logger.warning(
+                    f"✗ Failed to remove backup file from router: {filename} - {error_msg}"
+                )
