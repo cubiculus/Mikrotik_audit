@@ -237,6 +237,9 @@ test_empty_lines.py
 test_filter_real.py
 test_output_format.py
 cache_example.py
+test_all_commands.py
+test_all_commands_results.json
+debug_*.py
 # ✅ РАЗРЕШЁННЫЕ СКРИПТЫ УСТАНОВКИ
 !scripts/quick_install.sh
 !scripts/install.sh
