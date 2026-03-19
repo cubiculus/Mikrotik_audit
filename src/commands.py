@@ -125,8 +125,8 @@ AUDIT_COMMANDS_STANDARD = [
     "/queue type print",
 
     # Logs - RouterOS v7 doesn't support count= parameter
-    # "/log print without-paging",  # RouterOS v7: expected end of command
-    # '/log print where message~"firewall" without-paging',  # Moved to Comprehensive
+    "/log print without-paging",  # RouterOS v7: expected end of command
+    '/log print where message~"firewall" without-paging',
 
     # Connectivity Tests
     "/ping 8.8.8.8 count=5",
