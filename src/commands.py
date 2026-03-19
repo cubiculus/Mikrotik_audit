@@ -100,7 +100,7 @@ AUDIT_COMMANDS_STANDARD = [
     "/ip firewall connection print detail where connection-state=established",
     # Firewall - Service Ports
     "/ip firewall service-port print",
-    "/ip firewall layer7-protocol print detail",
+    # "/ip firewall layer7-protocol print detail",  # Empty - L7 protocols not defined by default
 
     # Services
     "/ip service print detail",
@@ -289,7 +289,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip firewall address-list print detail",
     "/ip firewall address-list print detail where dynamic=no",
     "/ip firewall address-list print detail where dynamic=yes",
-    "/ip firewall layer7-protocol print",
+    # "/ip firewall layer7-protocol print",  # Empty - L7 protocols not defined by default
     "/ip firewall service-port print",
     "/ip firewall export verbose",
 
@@ -343,9 +343,9 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # Logs - RouterOS v7 doesn't support count= parameter
     # "/log print without-paging",  # Fails on RouterOS v7.22 (expected end of command)
-    '/log print where message~"firewall" without-paging',
-    '/log print where message~"ovpn" without-paging',
-    '/log print where message~"wireguard" without-paging',
+    '/log print where topics~"firewall" count=100',  # Fixed: use topics~ instead of message~, add count
+    '/log print where topics~"ovpn" count=50',
+    '/log print where topics~"wireguard" count=50',
     # "/log print follow=no without-paging",  # RouterOS v7: follow is a flag, not follow=no
 
     # Connectivity Tests
