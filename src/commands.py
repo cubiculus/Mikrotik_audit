@@ -180,10 +180,10 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/interface vlan print detail",
     "/interface veth print detail",
 
-    # Interfaces - Wireless (RouterOS v6) - not available in v7
-    "/interface wireless print detail",  # RouterOS v7: bad command name
+    # Interfaces - Wireless (RouterOS v6 legacy)
+    "/interface wireless print detail",  # Legacy wireless package (conflicts with wifi-qcom/wifi-qcom-ac in v7.13+)
 
-    # Interfaces - WiFi (RouterOS v7)
+    # Interfaces - WiFi (RouterOS v7.13+)
     "/interface wifi print detail",
     "/interface wifi security print detail",
     "/interface wifi registration-table print detail",
@@ -191,7 +191,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     # Containers
     "/container print detail",
     "/container config print",
-    "/container image print",  # RouterOS v7: bad command name
+    "/container image print",  # Not in RouterOS v7 docs (use /container print)
     "/container envs print detail",
     "/container mounts print detail",
 
@@ -222,11 +222,11 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip route print detail where gateway~\"veth\"",
     "/ip rule print detail",  # RouterOS v7: bad command name
     "/routing rule print detail",
-    "/ip route rule print detail",  # RouterOS v7: bad command name
+    "/ip route rule print detail",  # RouterOS v7: bad command name (use /routing rule)
     "/routing table print detail",
     "/routing table print",
-    "/routing filter print detail",  # RouterOS v7: bad command name
-    "/routing vrf print detail",  # RouterOS v7: bad command name
+    "/routing filter print detail",  # Valid in RouterOS v7
+    "/routing vrf print detail",  # RouterOS v7: bad command name (use /ip vrf)
 
     # Routing Protocols - BGP
     "/routing bgp instance print detail",
@@ -248,7 +248,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # DNS
     "/ip dns print",
-    "/ip dns print detail",  # RouterOS v7: expected end of command
+    "/ip dns print detail",  # Valid in RouterOS v7
     "/ip dns cache print detail",
     "/ip dns static print detail",
 
@@ -332,21 +332,21 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/queue type print",
 
     # CAPsMAN / WiFi
-    "/caps-man interface print detail",  # RouterOS v7: bad command name
+    "/caps-man interface print detail",  # Legacy CAPsMAN (requires wireless package, conflicts with wifi-qcom)
 
     # Monitoring & Tools
     "/tool netwatch print detail",
-    "/ip accounting snapshot print",  # RouterOS v7: bad command name
+    "/ip accounting snapshot print",  # Not confirmed in RouterOS v7.22
     # Sniffer использует интерфейс по умолчанию или первый доступный
     # Интерфейс определяется автоматически через /interface print
-    "/tool sniffer quick protocol=tcp duration=30",  # RouterOS v7: expected end of command
+    "/tool sniffer quick protocol=tcp duration=30",  # RouterOS v7: wrong syntax (use ip-protocol=, no duration in quick mode)
 
     # Logs - RouterOS v7 doesn't support count= parameter
-    "/log print without-paging",  # RouterOS v7: expected end of command
+    "/log print without-paging",  # Valid in RouterOS v7
     '/log print where message~"firewall" without-paging',
     '/log print where message~"ovpn" without-paging',
     '/log print where message~"wireguard" without-paging',
-    "/log print follow=no without-paging",  # RouterOS v7: expected end of command
+    # "/log print follow=no without-paging",  # RouterOS v7: follow is a flag, not follow=no
 
     # Connectivity Tests
     "/ping 8.8.8.8 count=5",
