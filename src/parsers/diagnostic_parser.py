@@ -284,6 +284,7 @@ def parse_ping_results(results: List) -> dict:
     # Парсим результаты
     lines = output.split('\n')
     stats_line = ""
+    stats_found = False
 
     for line in lines:
         line = line.strip()
@@ -293,10 +294,11 @@ def parse_ping_results(results: List) -> dict:
         # Ищем статистику - может быть на нескольких строках
         if 'sent=' in line and 'received=' in line:
             stats_line += " " + line
-        elif stats_line and ('min-rtt=' in line or 'max-rtt=' in line or 'avg-rtt=' in line):
+            stats_found = True
+        elif stats_found and ('min-rtt=' in line or 'max-rtt=' in line or 'avg-rtt=' in line):
             # Продолжение статистики на следующей строке
             stats_line += " " + line
-        elif stats_line:
+        elif stats_found:
             # Конец статистики - парсим
             break
 
@@ -316,25 +318,29 @@ def parse_ping_results(results: List) -> dict:
             ping_result['max_rtt'] = data.get('max_rtt', '') or data.get('max-rtt', '')
         except ValueError:
             pass
-    else:
-        # Парсим отдельные пинги
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
 
-            # Парсим отдельные пинги
-            # Формат: "0 8.8.8.8 56 116 2ms" или "0 8.8.8.8 56 116 2ms ttl-unreachable"
-            parts = line.split()
-            if len(parts) >= 5 and parts[0].isdigit():
-                ping_entry = {
-                    'seq': int(parts[0]),
-                    'host': parts[1] if len(parts) > 1 else '',
-                    'size': int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0,
-                    'ttl': int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0,
-                    'time': parts[4] if len(parts) > 4 else '',
-                    'status': ' '.join(parts[5:]) if len(parts) > 5 else 'ok',
-                }
-                ping_result['results'].append(ping_entry)
+    # Парсим отдельные пинги (независимо от статистики)
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Пропускаем строки статистики
+        if 'sent=' in line or 'received=' in line:
+            continue
+
+        # Парсим отдельные пинги
+        # Формат: "0 8.8.8.8 56 116 2ms" или "0 8.8.8.8 56 116 2ms ttl-unreachable"
+        parts = line.split()
+        if len(parts) >= 5 and parts[0].isdigit():
+            ping_entry = {
+                'seq': int(parts[0]),
+                'host': parts[1] if len(parts) > 1 else '',
+                'size': int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0,
+                'ttl': int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0,
+                'time': parts[4] if len(parts) > 4 else '',
+                'status': ' '.join(parts[5:]) if len(parts) > 5 else 'ok',
+            }
+            ping_result['results'].append(ping_entry)
 
     return ping_result
