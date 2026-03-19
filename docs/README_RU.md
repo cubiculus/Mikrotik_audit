@@ -10,6 +10,8 @@
 ![MikroTik Audit](https://img.shields.io/badge/MikroTik-RouterOS-blue?style=flat-square&logo=mikrotik)
 ![GitHub last commit](https://img.shields.io/github/last-commit/cubiculus/Mikrotik_audit)
 
+> 🔐 **Важно:** Перед первым запуском ознакомьтесь с [Руководством по настройке SSH](SSH_SECURITY_RU.md)
+
 ## 📖 Содержание
 
 - [Возможности](#-возможности)
@@ -374,6 +376,43 @@ SSHConnectionError: Connection failed
 - Проверьте доступность роутера (`ping 192.168.88.1`)
 - Убедитесь, что SSH включен в RouterOS
 - Проверьте логин/пароль
+
+### Ошибка неизвестного хоста
+
+```
+SSHConnectionError: Server '192.168.1.1' not found in known_hosts
+```
+
+**Причина:** Инструмент использует политику безопасности `RejectPolicy()` которая требует предварительного добавления ключа роутера в файл `known_hosts` для защиты от MITM-атак.
+
+**Решение:**
+
+**Вариант 1: Добавить ключ роутера (рекомендуется)**
+
+```powershell
+# Windows PowerShell
+ssh-keyscan -H 192.168.1.1 | Add-Content $env:USERPROFILE\.ssh\known_hosts
+
+# Linux/Mac
+ssh-keyscan -H 192.168.1.1 >> ~/.ssh/known_hosts
+```
+
+**Вариант 2: Проверить путь к known_hosts**
+
+Файл должен находиться по пути:
+- **Windows:** `C:\Users\<User>\.ssh\known_hosts`
+- **Linux/Mac:** `~/.ssh/known_hosts`
+
+**Вариант 3: Использовать SSH ключ вместо пароля**
+
+```bash
+# Сгенерировать SSH ключ (если нет)
+ssh-keygen -t ed25519
+
+# Добавить публичный ключ на роутер через WinBox или Terminal
+# Затем запустить аудит с ключом
+python -m src.cli --ssh-user admin --ssh-key-file ~/.ssh/id_ed25519
+```
 
 ### Ошибка таймаута
 

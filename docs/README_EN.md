@@ -10,6 +10,8 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 ![MikroTik Audit](https://img.shields.io/badge/MikroTik-RouterOS-blue?style=flat-square&logo=mikrotik)
 ![GitHub last commit](https://img.shields.io/github/last-commit/cubiculus/Mikrotik_audit)
 
+> 🔐 **Important:** Before first run, see [SSH Security Setup Guide](SSH_SECURITY.md)
+
 ## 📖 Table of Contents
 
 - [Features](#-features)
@@ -375,6 +377,43 @@ SSHConnectionError: Connection failed
 - Check router availability (`ping 192.168.88.1`)
 - Ensure SSH is enabled in RouterOS
 - Verify login/password
+
+### Unknown Host Error
+
+```
+SSHConnectionError: Server '192.168.1.1' not found in known_hosts
+```
+
+**Cause:** The tool uses `RejectPolicy()` security policy which requires the router's host key to be pre-added to the `known_hosts` file to protect against MITM attacks.
+
+**Solution:**
+
+**Option 1: Add router key (recommended)**
+
+```powershell
+# Windows PowerShell
+ssh-keyscan -H 192.168.1.1 | Add-Content $env:USERPROFILE\.ssh\known_hosts
+
+# Linux/Mac
+ssh-keyscan -H 192.168.1.1 >> ~/.ssh/known_hosts
+```
+
+**Option 2: Check known_hosts path**
+
+The file should be located at:
+- **Windows:** `C:\Users\<User>\.ssh\known_hosts`
+- **Linux/Mac:** `~/.ssh/known_hosts`
+
+**Option 3: Use SSH key instead of password**
+
+```bash
+# Generate SSH key (if not exists)
+ssh-keygen -t ed25519
+
+# Add public key to router via WinBox or Terminal
+# Then run audit with key
+python -m src.cli --ssh-user admin --ssh-key-file ~/.ssh/id_ed25519
+```
 
 ### Timeout Error
 

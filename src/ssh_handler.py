@@ -177,6 +177,15 @@ class SSHConnectionPool:
     def _create_connection(self) -> paramiko.SSHClient:
         """Create a new SSH connection with validated credentials."""
         client = paramiko.SSHClient()
+
+        # Load known_hosts file explicitly
+        known_hosts_path = Path("~/.ssh/known_hosts").expanduser()
+        if known_hosts_path.exists():
+            client.load_host_keys(str(known_hosts_path))
+            logger.debug(f"Loaded {len(client.get_host_keys())} host keys from {known_hosts_path}")
+        else:
+            logger.warning(f"known_hosts file not found at {known_hosts_path}")
+
         # RejectPolicy prevents MITM attacks by rejecting unknown host keys
         # Host keys must be pre-added to known_hosts file for security
         client.set_missing_host_key_policy(paramiko.RejectPolicy())

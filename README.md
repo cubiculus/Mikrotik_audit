@@ -15,9 +15,13 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 
 ## 📖 Documentation / Документация
 
-**EN:** [View English documentation](docs/README_EN.md)
+**EN:**
+- [Main Documentation](docs/README_EN.md)
+- [SSH Security Setup Guide](docs/SSH_SECURITY.md)
 
-**RU:** [Смотреть русскую документацию](docs/README_RU.md)
+**RU:**
+- [Основная документация](docs/README_RU.md)
+- [Руководство по настройке SSH](docs/SSH_SECURITY_RU.md)
 
 ## 🚀 Quick Start
 
@@ -71,15 +75,25 @@ set MIKROTIK_PASSWORD=your_password && python -m src.cli --ssh-user admin --all-
 
 **Windows:**
 ```powershell
+# First time setup: Add router's SSH key to known_hosts
+ssh-keyscan -H 192.168.1.1 | Add-Content $env:USERPROFILE\.ssh\known_hosts
+
+# Run audit
 scripts\run_audit.bat --ssh-user admin
 ```
 
 **Linux/Mac:**
 ```bash
+# First time setup: Add router's SSH key to known_hosts
+ssh-keyscan -H 192.168.1.1 >> ~/.ssh/known_hosts
+
+# Run audit
 ./scripts/run_audit.sh --ssh-user admin
 ```
 
 > **Note:** Set `MIKROTIK_PASSWORD` environment variable before running, or use SSH key authentication.
+>
+> 🔒 **Security:** The tool uses `RejectPolicy()` which requires the router's SSH key to be pre-added to `known_hosts` for protection against MITM attacks.
 
 ## 📸 Screenshots
 

@@ -117,9 +117,19 @@ class BackupManager:
                 return backup_result
 
             # exit_status == 0: RouterOS doesn't print a success message.
-            # Verify the file actually exists on the router.
+            # Wait a moment for the file to be written to disk
+            import time
+            time.sleep(1.5)  # RouterOS may take time to sync file to storage
+
+            # Verify the file actually exists on the router (root directory only)
             backup_filename = f"audit_backup_{backup_timestamp}.backup"
             file_size = self._get_file_size(backup_filename)
+
+            # Retry once if file not found (RouterOS file system sync delay)
+            if file_size is None:
+                logger.debug("Backup file not found immediately, retrying...")
+                time.sleep(2.0)
+                file_size = self._get_file_size(backup_filename)
 
             if file_size is not None and file_size > 0:
                 # File confirmed on router — backup successful.
@@ -159,18 +169,35 @@ class BackupManager:
         return backup_result
 
     def _get_file_size(self, filename: str) -> Optional[int]:
-        """Get file size from router."""
+        """Get file size from router. Only checks root directory files."""
+        # RouterOS v7: /file print detail where name="..." doesn't work reliably
+        # Use /file print where type="backup" and find by name instead
         _, file_output, _ = self.ssh.execute_command(
-            f'/file print detail where name="{filename}"'
+            '/file print where type="backup"'
         )
 
         for line in file_output.split('\n'):
-            if 'size:' in line.lower():
-                try:
-                    size_str = line.split(':', 1)[1].strip().split()[0]
-                    return int(size_str)
-                except (ValueError, IndexError):
-                    pass
+            line = line.strip()
+            # Look for our filename in the output
+            # Format: "164 audit_backup_20260319_221316.backup  backup  237.2KiB  2026-03-19 22:13:17"
+            if filename in line and 'backup' in line.lower():
+                # Extract size (3rd column in KiB format)
+                parts = line.split()
+                for i, part in enumerate(parts):
+                    if 'KiB' in part or 'MiB' in part or 'GiB' in part:
+                        try:
+                            # Convert KiB/MiB/GiB to bytes
+                            size_str = part.replace('KiB', '').replace('MiB', '').replace('GiB', '')
+                            size = float(size_str)
+                            if 'KiB' in part:
+                                return int(size * 1024)
+                            elif 'MiB' in part:
+                                return int(size * 1024 * 1024)
+                            elif 'GiB' in part:
+                                return int(size * 1024 * 1024 * 1024)
+                        except (ValueError, IndexError):
+                            pass
+
         return None
 
     def _download_backup(
