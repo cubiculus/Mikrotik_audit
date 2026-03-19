@@ -16,53 +16,74 @@ class TestBackupSuccess:
         backup_manager = BackupManager(mock_ssh)
 
         # Mock successful backup command (exit_status=0)
+        # RouterOS v7: /file print where type="backup" returns file list
         mock_ssh.execute_command.side_effect = [
             (0, "Backup created", ""),  # /system backup save
-            (0, "  size: 4096", ""),    # /file print detail
+            (0, '164 audit_backup_20260318_120000.backup  backup  237.2KiB  2026-03-18 12:00:01', ""),  # /file print where type="backup"
             (0, "", ""),                # /file remove (cleanup)
         ]
 
-        # Mock _get_file_size to return valid size
-        with patch.object(backup_manager, '_get_file_size', return_value=4096):
-            with patch.object(backup_manager, '_download_backup'):
-                with patch.object(backup_manager, '_cleanup_backup') as mock_cleanup:
-                    # Act
-                    result = backup_manager.perform_backup(
-                        output_dir=Path("/tmp/backups"),
-                        timestamp="20260318_120000"
-                    )
+        # Act
+        result = backup_manager.perform_backup(
+            output_dir=Path("/tmp/backups"),
+            timestamp="20260318_120000"
+        )
 
-                    # Assert
-                    assert result.status == "success"
-                    assert result.file_name == "audit_backup_20260318_120000.backup"
-                    assert result.file_size == 4096
-                    assert result.error_message is None
+        # Assert
+        assert result.status == "success"
+        assert result.file_name == "audit_backup_20260318_120000.backup"
+        assert result.file_size == 242892  # 237.2 * 1024
+        assert result.error_message is None
 
-                    # Verify cleanup was called
-                    mock_cleanup.assert_called_once_with("audit_backup_20260318_120000.backup")
-
-    def test_backup_failure_on_exit_status_zero_but_file_not_found(self):
-        """Test that exit_status=0 with missing file results in failed status."""
+    def test_backup_with_retry_on_file_not_found(self):
+        """Test that backup retries when file not found immediately."""
         # Arrange
         mock_ssh = MagicMock()
         backup_manager = BackupManager(mock_ssh)
 
-        # Mock backup command with exit_status=0 but file not found
-        mock_ssh.execute_command.return_value = (0, "", "")
+        # First call returns empty (file not ready), second call returns file
+        mock_ssh.execute_command.side_effect = [
+            (0, "Backup created", ""),  # /system backup save
+            (0, "", ""),                # /file print where type="backup" (empty - not ready)
+            (0, '164 audit_backup_20260318_120000.backup  backup  237.2KiB  2026-03-18 12:00:01', ""),  # Retry - file found
+            (0, "", ""),                # /file remove (cleanup)
+        ]
 
-        # Mock _get_file_size to return None (file not found)
-        with patch.object(backup_manager, '_get_file_size', return_value=None):
-            # Act
-            result = backup_manager.perform_backup(
-                output_dir=Path("/tmp/backups"),
-                timestamp="20260318_120000"
-            )
+        # Act
+        result = backup_manager.perform_backup(
+            output_dir=Path("/tmp/backups"),
+            timestamp="20260318_120000"
+        )
 
-            # Assert - command succeeded but file not found = failed (not skipped)
-            assert result.status == "failed"
-            assert result.file_name == "audit_backup_20260318_120000.backup"
-            assert "exit_status=0 but file not found" in result.error_message
-            assert "storage" in result.error_message.lower() or "storage" in result.error_message.lower()
+        # Assert
+        assert result.status == "success"
+        assert result.file_size == 242892  # 237.2 * 1024
+        # Verify execute_command was called 4 times (backup + 2x file check + cleanup)
+        assert mock_ssh.execute_command.call_count == 4
+
+    def test_backup_failure_on_exit_status_zero_but_file_not_found_after_retry(self):
+        """Test that exit_status=0 with missing file after retry results in failed status."""
+        # Arrange
+        mock_ssh = MagicMock()
+        backup_manager = BackupManager(mock_ssh)
+
+        # Mock backup command with exit_status=0 but file not found even after retry
+        mock_ssh.execute_command.side_effect = [
+            (0, "Backup created", ""),  # /system backup save
+            (0, "", ""),                # /file print where type="backup" (empty)
+            (0, "", ""),                # /file print where type="backup" (retry - still empty)
+        ]
+
+        # Act
+        result = backup_manager.perform_backup(
+            output_dir=Path("/tmp/backups"),
+            timestamp="20260318_120000"
+        )
+
+        # Assert - command succeeded but file not found = failed
+        assert result.status == "failed"
+        assert result.file_name == "audit_backup_20260318_120000.backup"
+        assert "exit_status=0 but file not found" in result.error_message
 
 
 class TestBackupPermissionDenied:
@@ -106,26 +127,97 @@ class TestCleanupCalledAfterDownload:
         # Mock successful backup
         mock_ssh.execute_command.side_effect = [
             (0, "Backup created", ""),  # /system backup save
-            (0, "  size: 8192", ""),    # /file print detail
+            (0, '164 audit_backup_20260318_150000.backup  backup  237.2KiB  2026-03-18 15:00:01', ""),  # /file print where type="backup"
             (0, "", ""),                # /file remove (cleanup)
         ]
 
-        # Mock _get_file_size to return valid size (critical for success path)
-        with patch.object(backup_manager, '_get_file_size', return_value=8192):
-            with patch.object(backup_manager, '_download_backup') as mock_download:
-                with patch.object(backup_manager, '_cleanup_backup') as mock_cleanup:
-                    # Act
-                    result = backup_manager.perform_backup(
-                        output_dir=Path("/tmp/backups"),
-                        timestamp="20260318_150000"
-                    )
+        with patch.object(backup_manager, '_download_backup') as mock_download:
+            with patch.object(backup_manager, '_cleanup_backup') as mock_cleanup:
+                # Act
+                result = backup_manager.perform_backup(
+                    output_dir=Path("/tmp/backups"),
+                    timestamp="20260318_150000"
+                )
 
-                    # Assert
-                    assert result.status == "success"
+                # Assert
+                assert result.status == "success"
 
-                    # Verify download was called before cleanup
-                    mock_cleanup.assert_called_once()
+                # Verify download was called before cleanup
+                mock_cleanup.assert_called_once()
 
-                    # Check that cleanup was called after download
-                    assert mock_download.call_count == 1
-                    assert mock_cleanup.call_count == 1
+                # Check that cleanup was called after download
+                assert mock_download.call_count == 1
+                assert mock_cleanup.call_count == 1
+
+
+class TestGetFileSize:
+    """Tests for _get_file_size method."""
+
+    def test_get_file_size_kib(self):
+        """Test parsing file size in KiB format."""
+        # Arrange
+        mock_ssh = MagicMock()
+        backup_manager = BackupManager(mock_ssh)
+
+        # RouterOS v7 output format
+        mock_ssh.execute_command.return_value = (
+            0,
+            '164 audit_backup_20260318_120000.backup  backup  237.2KiB  2026-03-18 12:00:01',
+            ""
+        )
+
+        # Act
+        size = backup_manager._get_file_size("audit_backup_20260318_120000.backup")
+
+        # Assert
+        assert size == 242892  # 237.2 * 1024
+
+    def test_get_file_size_mib(self):
+        """Test parsing file size in MiB format."""
+        # Arrange
+        mock_ssh = MagicMock()
+        backup_manager = BackupManager(mock_ssh)
+
+        mock_ssh.execute_command.return_value = (
+            0,
+            '165 large_backup.backup  backup  10.5MiB  2026-03-18 12:00:01',
+            ""
+        )
+
+        # Act
+        size = backup_manager._get_file_size("large_backup.backup")
+
+        # Assert
+        assert size == 11010048  # 10.5 * 1024 * 1024
+
+    def test_get_file_size_not_found(self):
+        """Test when file not found in backup list."""
+        # Arrange
+        mock_ssh = MagicMock()
+        backup_manager = BackupManager(mock_ssh)
+
+        mock_ssh.execute_command.return_value = (
+            0,
+            '164 other_backup.backup  backup  237.2KiB  2026-03-18 12:00:01',
+            ""
+        )
+
+        # Act
+        size = backup_manager._get_file_size("audit_backup_20260318_120000.backup")
+
+        # Assert
+        assert size is None
+
+    def test_get_file_size_empty_output(self):
+        """Test when /file print returns empty output."""
+        # Arrange
+        mock_ssh = MagicMock()
+        backup_manager = BackupManager(mock_ssh)
+
+        mock_ssh.execute_command.return_value = (0, "", "")
+
+        # Act
+        size = backup_manager._get_file_size("audit_backup_20260318_120000.backup")
+
+        # Assert
+        assert size is None
