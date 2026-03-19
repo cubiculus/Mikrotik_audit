@@ -241,12 +241,27 @@ class HTMLReportGenerator(BaseReportGenerator):
         html_issues = []
         for issue in issues:
             severity_class = issue.severity.lower()
+
+            # Fix commands block
+            fix_commands_html = ""
+            if issue.fix_commands:
+                commands_escaped = [cmd.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') for cmd in issue.fix_commands]
+                commands_text = '\n'.join(commands_escaped)
+                fix_commands_html = f'''
+                    <div class="fix-commands" style="margin-top: 10px; padding: 10px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px;">
+                        <strong style="color: #065f46; font-size: 0.9em;">🔧 Commands to fix:</strong>
+                        <button onclick="copyFixCommands(this)" style="float: right; padding: 2px 8px; font-size: 0.8em; cursor: pointer; background: #10b981; color: white; border: none; border-radius: 3px;">Copy</button>
+                        <pre class="fix-commands-code" style="margin-top: 8px; padding: 8px; background: #1e1e1e; color: #f0f0f0; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.85em; white-space: pre-wrap;">{commands_text}</pre>
+                    </div>
+                '''
+
             html_issues.append(f'''
                 <div class="security-issue {severity_class}">
                     <div class="issue-title">[{issue.severity}] {issue.finding}</div>
                     <div class="issue-detail"><strong>Category:</strong> {issue.category}</div>
                     <div class="issue-detail"><strong>Recommendation:</strong> {issue.recommendation}</div>
                     <div class="issue-detail"><strong>Command:</strong> <code>{issue.command}</code></div>
+                    {fix_commands_html}
                 </div>
             ''')
 

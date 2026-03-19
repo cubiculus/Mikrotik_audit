@@ -186,7 +186,7 @@ class TestSecurityAnalyzer:
             CommandResult(
                 index=1,
                 command="/ip ssh print",
-                stdout='strong-crypto=no',
+                stdout='strong-crypto: no',
                 has_error=False
             )
         ]
@@ -247,7 +247,7 @@ class TestSecurityAnalyzer:
             CommandResult(
                 index=1,
                 command="/ip dns print",
-                stdout='allow-remote-requests=yes',
+                stdout='allow-remote-requests: yes',
                 has_error=False
             )
         ]

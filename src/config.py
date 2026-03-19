@@ -1,5 +1,5 @@
 # Configuration file for MikroTik Audit
-from typing import Any, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 import os
@@ -80,6 +80,7 @@ class SecurityIssue(BaseModel):
     description: str = ""
     recommendation: str
     command: str = ""
+    fix_commands: List[str] = Field(default_factory=list)  # Команды для исправления проблемы
 
     def __init__(self, **data: Any) -> None:
         """Initialize SecurityIssue with backward compatibility for finding/description fields."""
