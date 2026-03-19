@@ -5,6 +5,7 @@ from src.parsers.system_parser import (
     parse_system_health,
     parse_system_package,
     parse_system_package_update,
+    parse_disks,
 )
 from src.config import CommandResult
 
@@ -186,3 +187,121 @@ class TestSystemPackageUpdateParser:
         update = parse_system_package_update(results)
 
         assert update['scheduled'] is True
+
+
+class TestDiskParser:
+    """Tests for disk parser."""
+
+    def test_parse_empty_results(self):
+        """Test parsing empty results."""
+        disks = parse_disks([])
+        assert disks == []
+
+    def test_parse_single_disk(self):
+        """Test parsing single disk."""
+        output = """Flags: R - REMOVABLE
+0 R name="usb1" type="usb" path="/usb1" total-size=29.8GiB free-size=22.1GiB
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+        assert disks[0].name == "usb1"
+        assert disks[0].type == "usb"
+        assert disks[0].path == "/usb1"
+        assert disks[0].total_size > 0
+        assert disks[0].free_size > 0
+        assert 0 < disks[0].used_percent < 100
+
+    def test_parse_multiple_disks(self):
+        """Test parsing multiple disks."""
+        output = """Flags: R - REMOVABLE
+0 name="disk1" type="hdd" path="/disk1" total-size=500GiB free-size=250GiB
+1 R name="usb1" type="usb" path="/usb1" total-size=32GiB free-size=16GiB
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 2
+        assert disks[0].name == "disk1"
+        assert disks[1].name == "usb1"
+
+    def test_parse_disk_without_removable_flag(self):
+        """Test parsing disk without removable flag."""
+        output = """0 name="system" type="internal" path="/" total-size=1GiB free-size=512MiB
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+        assert disks[0].name == "system"
+        assert disks[0].type == "internal"
+
+    def test_parse_disk_with_different_units(self):
+        """Test parsing disk with different size units."""
+        output = """0 name="small" type="flash" total-size=100MiB free-size=50MiB
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+        assert disks[0].total_size == 100 * 1024 * 1024
+        assert disks[0].free_size == 50 * 1024 * 1024
+
+    def test_parse_disk_without_free_size(self):
+        """Test parsing disk without free-size information."""
+        output = """0 name="disk1" type="hdd" path="/disk1" total-size=500GiB
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+        assert disks[0].total_size > 0
+        assert disks[0].free_size == 0
+        assert disks[0].used_percent == 100.0
+
+    def test_parse_disk_skip_export(self):
+        """Test that global /export command output is skipped."""
+        output = """name=disk1 type=hdd path=/disk1 total-size=500GiB
+"""
+        # Global /export command should be skipped (not /disk print export)
+        results = [CommandResult(index=0, command="/export", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 0
+
+    def test_parse_disk_skip_error_results(self):
+        """Test that error results are skipped."""
+        output = """0 name="usb1" type="usb" total-size=32GiB free-size=16GiB
+"""
+        results = [
+            CommandResult(index=0, command="/disk print", stdout=output, has_error=False),
+            CommandResult(index=1, command="/disk print", stdout="Error: disk not found", has_error=True),
+        ]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+
+    def test_parse_disk_skip_duplicates(self):
+        """Test that duplicate disk entries are skipped."""
+        output = """0 name="disk1" type="hdd" total-size=500GiB free-size=250GiB
+1 name="disk1" type="hdd" total-size=500GiB free-size=250GiB
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+        assert disks[0].name == "disk1"
+
+    def test_parse_disk_skip_invalid_lines(self):
+        """Test that lines without name or total-size are skipped."""
+        output = """Flags: R - REMOVABLE
+0 name=disk1 total-size=500GiB
+1 type=hdd total-size=500GiB
+2 name=disk2 type=hdd
+"""
+        results = [CommandResult(index=0, command="/disk print", stdout=output)]
+        disks = parse_disks(results)
+
+        assert len(disks) == 1
+        assert disks[0].name == "disk1"

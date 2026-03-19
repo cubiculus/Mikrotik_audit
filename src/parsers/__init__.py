@@ -10,6 +10,7 @@ from .system_parser import (
     parse_system_health,
     parse_system_package,
     parse_system_package_update,
+    parse_disks,
 )
 from .service_parser import (
     parse_ip_service,
@@ -48,6 +49,7 @@ __all__ = [
     'parse_system_health',
     'parse_system_package',
     'parse_system_package_update',
+    'parse_disks',
     # Services
     'parse_ip_service',
     'parse_ssh_sessions',
