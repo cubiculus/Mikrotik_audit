@@ -55,7 +55,7 @@ AUDIT_COMMANDS_STANDARD = [
     "/ip route print detail where active=yes",
     "/ip route print detail where active=no",
     '/ip route print detail where routing-mark!=""',
-    # "/ip rule print detail",  # RouterOS v7: bad command name - use /ip route rule instead
+    "/ip rule print detail",  # RouterOS v7: bad command name
     "/routing rule print detail",
     "/routing table print detail",
     "/ip arp print detail",
@@ -153,9 +153,8 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/system health print",
     "/system routerboard print",
     "/system license print",
-    # "/system certificate print detail",  # RouterOS v7: bad command name
-    "/certificate print detail",  # Fixed for RouterOS v7
-    # "/system/backup/export",  # RouterOS v7: bad command name - already in /export
+    "/system certificate print detail",  # RouterOS v7: bad command name
+    "/system/backup/export",  # RouterOS v7: bad command name
 
     # Users & Access
     "/user print detail",
@@ -182,7 +181,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/interface veth print detail",
 
     # Interfaces - Wireless (RouterOS v6) - not available in v7
-    # "/interface wireless print detail",  # RouterOS v7: bad command name
+    "/interface wireless print detail",  # RouterOS v7: bad command name
 
     # Interfaces - WiFi (RouterOS v7)
     "/interface wifi print detail",
@@ -192,7 +191,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     # Containers
     "/container print detail",
     "/container config print",
-    # "/container image print",  # RouterOS v7: bad command name
+    "/container image print",  # RouterOS v7: bad command name
     "/container envs print detail",
     "/container mounts print detail",
 
@@ -221,13 +220,13 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip route export",
     '/ip route print detail where routing-mark!=""',
     "/ip route print detail where gateway~\"veth\"",
-    # "/ip rule print detail",  # RouterOS v7: bad command name
+    "/ip rule print detail",  # RouterOS v7: bad command name
     "/routing rule print detail",
-    # "/ip route rule print detail",  # RouterOS v7: bad command name - use /routing rule
+    "/ip route rule print detail",  # RouterOS v7: bad command name
     "/routing table print detail",
     "/routing table print",
-    # "/routing filter print detail",  # RouterOS v7: bad command name
-    # "/routing vrf print detail",  # RouterOS v7: bad command name
+    "/routing filter print detail",  # RouterOS v7: bad command name
+    "/routing vrf print detail",  # RouterOS v7: bad command name
 
     # Routing Protocols - BGP
     "/routing bgp instance print detail",
@@ -249,7 +248,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # DNS
     "/ip dns print",
-    # "/ip dns print detail",  # RouterOS v7: expected end of command
+    "/ip dns print detail",  # RouterOS v7: expected end of command
     "/ip dns cache print detail",
     "/ip dns static print detail",
 
@@ -261,7 +260,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip dhcp-server lease print detail where status=bound",
     "/ip dhcp-server lease print detail where address-lists!=\"\"",
     "/ip dhcp-server option print detail",
-    # "/ip dhcp-option print detail",  # RouterOS v7: bad command name - duplicate
+    "/ip dhcp-option print detail",  # RouterOS v7: bad command name
     "/ip dhcp-server option sets print",
 
     # Firewall - Filter
@@ -333,21 +332,21 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/queue type print",
 
     # CAPsMAN / WiFi
-    # "/caps-man interface print detail",  # RouterOS v7: bad command name
+    "/caps-man interface print detail",  # RouterOS v7: bad command name
 
     # Monitoring & Tools
     "/tool netwatch print detail",
-    # "/ip accounting snapshot print",  # RouterOS v7: bad command name
+    "/ip accounting snapshot print",  # RouterOS v7: bad command name
     # Sniffer использует интерфейс по умолчанию или первый доступный
     # Интерфейс определяется автоматически через /interface print
-    # "/tool sniffer quick protocol=tcp duration=30",  # RouterOS v7: expected end of command
+    "/tool sniffer quick protocol=tcp duration=30",  # RouterOS v7: expected end of command
 
     # Logs - RouterOS v7 doesn't support count= parameter
-    # "/log print without-paging",  # RouterOS v7: expected end of command
+    "/log print without-paging",  # RouterOS v7: expected end of command
     '/log print where message~"firewall" without-paging',
     '/log print where message~"ovpn" without-paging',
     '/log print where message~"wireguard" without-paging',
-    # "/log print follow=no without-paging",  # RouterOS v7: expected end of command
+    "/log print follow=no without-paging",  # RouterOS v7: expected end of command
 
     # Connectivity Tests
     "/ping 8.8.8.8 count=5",
