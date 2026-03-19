@@ -346,3 +346,159 @@ class TestSecurityAnalyzer:
         ]
         issues = SecurityAnalyzer.analyze(results)
         assert len(issues) >= 3
+
+
+# ===== FIX COMMANDS TESTS =====
+
+class TestFixCommands:
+    """Tests for fix_commands feature."""
+
+    def test_fix_commands_field_exists(self):
+        """Test that SecurityIssue has fix_commands field."""
+        issue = SecurityIssue(
+            severity="High",
+            category="SSH",
+            finding="Test issue",
+            recommendation="Fix it",
+            fix_commands=["/command1", "/command2"]
+        )
+        assert issue.fix_commands == ["/command1", "/command2"]
+
+    def test_fix_commands_empty_by_default(self):
+        """Test that fix_commands is empty by default."""
+        issue = SecurityIssue(
+            severity="Medium",
+            category="Test",
+            finding="Test",
+            recommendation="Fix"
+        )
+        assert issue.fix_commands == []
+
+    def test_ssh_strong_crypto_fix_commands(self):
+        """Test that SSH strong crypto issue has fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip ssh print",
+                stdout='strong-crypto: no',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        ssh_issues = [i for i in issues if "strong crypto" in i.finding.lower()]
+        assert len(ssh_issues) > 0
+        assert len(ssh_issues[0].fix_commands) > 0
+        assert "/ip ssh set strong-crypto=yes" in ssh_issues[0].fix_commands
+
+    def test_telnet_service_fix_commands(self):
+        """Test that Telnet service issue has fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip service print",
+                stdout='name=telnet disabled=no',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        telnet_issues = [i for i in issues if "telnet" in i.finding.lower()]
+        assert len(telnet_issues) > 0
+        assert len(telnet_issues[0].fix_commands) > 0
+        assert "/ip service disable telnet" in telnet_issues[0].fix_commands
+
+    def test_ftp_service_fix_commands(self):
+        """Test that FTP service issue has fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip service print",
+                stdout='name=ftp disabled=no',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        ftp_issues = [i for i in issues if "ftp" in i.finding.lower()]
+        assert len(ftp_issues) > 0
+        assert len(ftp_issues[0].fix_commands) > 0
+        assert "/ip service disable ftp" in ftp_issues[0].fix_commands
+
+    def test_no_firewall_rules_fix_commands(self):
+        """Test that empty firewall issue has comprehensive fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip firewall filter print",
+                stdout="",  # Empty = no rules
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        firewall_issues = [i for i in issues if "no firewall" in i.finding.lower()]
+        assert len(firewall_issues) > 0
+        assert len(firewall_issues[0].fix_commands) > 5  # Multiple commands for firewall setup
+        assert any("chain=input" in cmd for cmd in firewall_issues[0].fix_commands)
+        assert any("chain=forward" in cmd for cmd in firewall_issues[0].fix_commands)
+
+    def test_ssh_root_login_fix_commands(self):
+        """Test that SSH root login issue has fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip ssh print",
+                stdout='allow-root-login=yes',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        root_issues = [i for i in issues if "root login" in i.finding.lower()]
+        assert len(root_issues) > 0
+        assert len(root_issues[0].fix_commands) > 0
+        assert "/ip ssh set allow-root-login=no" in root_issues[0].fix_commands
+
+    def test_http_service_fix_commands(self):
+        """Test that HTTP service issue has fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip service print",
+                stdout='name=www disabled=no',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        http_issues = [i for i in issues if "http" in i.finding.lower() or "www" in i.finding.lower()]
+        assert len(http_issues) > 0
+        assert len(http_issues[0].fix_commands) > 0
+        assert "/ip service disable www" in http_issues[0].fix_commands
+
+    def test_firewall_open_accept_rule_fix_commands(self):
+        """Test that open accept rule on WAN has fix commands."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip firewall filter print",
+                stdout='chain=input action=accept in-interface=ether1',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        open_issues = [i for i in issues if "open accept rule" in i.finding.lower()]
+        assert len(open_issues) > 0
+        assert len(open_issues[0].fix_commands) > 0
+        assert any("print where" in cmd for cmd in open_issues[0].fix_commands)
+
+    def test_all_fix_commands_are_strings(self):
+        """Test that all fix commands are strings."""
+        results = [
+            CommandResult(
+                index=1,
+                command="/ip ssh print",
+                stdout='strong-crypto: no allow-root-login=yes',
+                has_error=False
+            )
+        ]
+        issues = SecurityAnalyzer.analyze(results)
+        for issue in issues:
+            for cmd in issue.fix_commands:
+                assert isinstance(cmd, str)
+                assert len(cmd) > 0

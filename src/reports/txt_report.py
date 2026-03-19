@@ -83,6 +83,60 @@ class TXTReportGenerator(BaseReportGenerator):
             lines.append("")
             lines.append(separator)
 
+            # Security Findings section
+            if security_issues:
+                lines.append("")
+                lines.append("SECURITY FINDINGS")
+                lines.append("-" * 40)
+                lines.append(f"Total issues found: {len(security_issues)}")
+                lines.append("")
+
+                # Group by severity
+                high = [i for i in security_issues if i.severity == "High"]
+                medium = [i for i in security_issues if i.severity == "Medium"]
+                low = [i for i in security_issues if i.severity == "Low"]
+
+                if high:
+                    lines.append(">>> HIGH SEVERITY ISSUES")
+                    for issue in high:
+                        lines.append(f"  [{issue.severity}] {issue.finding}")
+                        lines.append(f"      Category: {issue.category}")
+                        lines.append(f"      Recommendation: {issue.recommendation}")
+                        lines.append(f"      Related Command: {issue.command}")
+                        if issue.fix_commands:
+                            lines.append("      Fix Commands:")
+                            for cmd in issue.fix_commands:
+                                lines.append(f"        {cmd}")
+                        lines.append("")
+
+                if medium:
+                    lines.append(">>> MEDIUM SEVERITY ISSUES")
+                    for issue in medium:
+                        lines.append(f"  [{issue.severity}] {issue.finding}")
+                        lines.append(f"      Category: {issue.category}")
+                        lines.append(f"      Recommendation: {issue.recommendation}")
+                        lines.append(f"      Related Command: {issue.command}")
+                        if issue.fix_commands:
+                            lines.append("      Fix Commands:")
+                            for cmd in issue.fix_commands:
+                                lines.append(f"        {cmd}")
+                        lines.append("")
+
+                if low:
+                    lines.append(">>> LOW SEVERITY ISSUES")
+                    for issue in low:
+                        lines.append(f"  [{issue.severity}] {issue.finding}")
+                        lines.append(f"      Category: {issue.category}")
+                        lines.append(f"      Recommendation: {issue.recommendation}")
+                        lines.append(f"      Related Command: {issue.command}")
+                        if issue.fix_commands:
+                            lines.append("      Fix Commands:")
+                            for cmd in issue.fix_commands:
+                                lines.append(f"        {cmd}")
+                        lines.append("")
+
+                lines.append(separator)
+
             # Failed commands summary
             if failed > 0:
                 lines.append("")

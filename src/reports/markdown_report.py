@@ -169,13 +169,20 @@ class MarkdownReportGenerator(BaseReportGenerator):
 
     def _format_security_issue(self, issue: SecurityIssue) -> str:
         """Format single security issue."""
-        return f"""#### {issue.finding}
+        lines = [f"""#### {issue.finding}
 
 - **Category:** {issue.category}
 - **Severity:** {issue.severity}
 - **Recommendation:** {issue.recommendation}
 - **Related Command:** `{issue.command}`
-"""
+"""]
+
+        if issue.fix_commands:
+            lines.append("**Fix Commands:**\n```bash")
+            lines.append("\n".join(issue.fix_commands))
+            lines.append("```\n")
+
+        return "\n".join(lines)
 
     def _create_backup_section(self, backup_result: BackupResult) -> str:
         """Create backup status section."""
