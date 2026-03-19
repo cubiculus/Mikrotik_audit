@@ -216,14 +216,14 @@ class TestSecurityAnalyzer:
         results = [
             CommandResult(
                 index=1,
-                command="/ppp secret print",
-                stdout='profile=default name=testuser',
+                command="/ppp profile print",
+                stdout='name="default" local-address=0.0.0.0 remote-address=0.0.0.0',
                 has_error=False
             )
         ]
         issues = SecurityAnalyzer.analyze(results)
         assert len(issues) > 0
-        assert any(issue.category == "PPP" and "default profile" in issue.finding.lower() for issue in issues)
+        assert any(issue.category == "PPP" and "Default PPP profile" in issue.finding for issue in issues)
 
     def test_ppp_admin_name(self):
         """Test detection of PPP secret with admin name."""

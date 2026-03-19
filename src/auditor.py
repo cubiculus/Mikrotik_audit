@@ -145,7 +145,8 @@ class MikroTikAuditor:
         fast = [c for c in commands if any(f in c for f in fast_commands_set)]
         heavy = [c for c in commands if any(h in c for h in heavy_commands_set)]
         dependent = [c for c in commands if any(d in c for d in dependent_commands_set)]
-        normal = [c for c in commands if c not in fast + heavy + dependent]
+        already_grouped = set(fast + heavy + dependent)
+        normal = [c for c in commands if c not in already_grouped]
 
         return {
             'fast': fast,

@@ -9,6 +9,17 @@ from src.cve_database import check_cve_for_version
 logger = logging.getLogger(__name__)
 
 
+def _has_no_rules(out: str) -> bool:
+    """Проверяет, что вывод команды не содержит правил фаервола.
+
+    RouterOS всегда возвращает заголовок 'Flags: ...' даже для пустых списков,
+    поэтому простая проверка len() < 10 не работает.
+    """
+    lines = [line.strip() for line in out.strip().splitlines() if line.strip()]
+    rule_lines = [line for line in lines if not line.startswith("Flags:")]
+    return len(rule_lines) == 0
+
+
 class SecurityAnalyzer:
     """Analyzes command results for security issues."""
 
@@ -59,7 +70,7 @@ class SecurityAnalyzer:
             "command": "/ip firewall filter print",
             "checks": [
                 {
-                    "condition": lambda out: len(out.strip()) < 10 or "no items" in out.lower() or "no such item" in out.lower(),
+                    "condition": lambda out: _has_no_rules(out),
                     "severity": "High",
                     "category": "Firewall",
                     "finding": "No firewall filter rules configured",
@@ -101,7 +112,7 @@ class SecurityAnalyzer:
             "command": "/ipv6 firewall filter print",
             "checks": [
                 {
-                    "condition": lambda out: len(out.strip()) < 10 or "no items" in out.lower() or "no such item" in out.lower(),
+                    "condition": lambda out: _has_no_rules(out),
                     "severity": "High",
                     "category": "IPv6 Firewall",
                     "finding": "No IPv6 firewall filter rules configured",
@@ -197,7 +208,7 @@ class SecurityAnalyzer:
             "command": "/ip ssh print",
             "checks": [
                 {
-                    "condition": lambda out: "strong-crypto=no" in out.lower(),
+                    "condition": lambda out: "strong-crypto: no" in out.lower(),
                     "severity": "High",
                     "category": "SSH",
                     "finding": "SSH strong crypto is disabled",
@@ -211,7 +222,7 @@ class SecurityAnalyzer:
                     "recommendation": "Disable root login and use regular user accounts"
                 },
                 {
-                    "condition": lambda out: "forwarding-enabled=yes" in out.lower(),
+                    "condition": lambda out: "forwarding-enabled: yes" in out.lower(),
                     "severity": "Medium",
                     "category": "SSH",
                     "finding": "SSH forwarding is enabled",
@@ -251,14 +262,14 @@ class SecurityAnalyzer:
             "command": "/ppp profile print",
             "checks": [
                 {
-                    "condition": lambda out: "name=default" in out.lower() and "local-address=0.0.0.0" in out.lower(),
+                    "condition": lambda out: bool(re.search(r'name\s*=\s*"default"', out, re.IGNORECASE)) and "local-address=0.0.0.0" in out.lower(),
                     "severity": "Medium",
                     "category": "PPP",
                     "finding": "Default PPP profile has unrestricted local address",
                     "recommendation": "Configure specific local addresses for PPP profiles"
                 },
                 {
-                    "condition": lambda out: "name=default" in out.lower() and "remote-address=0.0.0.0" in out.lower(),
+                    "condition": lambda out: bool(re.search(r'name\s*=\s*"default"', out, re.IGNORECASE)) and "remote-address=0.0.0.0" in out.lower(),
                     "severity": "Medium",
                     "category": "PPP",
                     "finding": "Default PPP profile has unrestricted remote address",
@@ -293,7 +304,7 @@ class SecurityAnalyzer:
                     "recommendation": "Configure multiple DNS servers for redundancy"
                 },
                 {
-                    "condition": lambda out: "allow-remote-requests=yes" in out.lower(),
+                    "condition": lambda out: "allow-remote-requests: yes" in out.lower(),
                     "severity": "Medium",
                     "category": "DNS",
                     "finding": "DNS allows remote requests",
