@@ -104,7 +104,7 @@ AUDIT_COMMANDS_STANDARD = [
 
     # Services
     "/ip service print detail",
-    "/ip ssh print detail",
+    "/ip ssh print",  # RouterOS v7 doesn't support 'detail' for this command
 
     # PPP/VPN
     "/ppp active print detail",
@@ -124,9 +124,9 @@ AUDIT_COMMANDS_STANDARD = [
     "/queue tree print stats",
     "/queue type print",
 
-    # Logs
-    "/log print count=50",
-    '/log print where message~"firewall" count=50',
+    # Logs - RouterOS v7 doesn't support count= parameter
+    "/log print without-paging",
+    '/log print where message~"firewall" without-paging',
 
     # Connectivity Tests
     "/ping 8.8.8.8 count=5",
@@ -322,7 +322,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # Services & SSH
     "/ip service print detail",
-    "/ip ssh print detail",
+    "/ip ssh print",  # RouterOS v7 doesn't support 'detail' for this command
 
     # Queues (QoS)
     "/queue simple print detail",
@@ -341,11 +341,11 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     # Интерфейс определяется автоматически через /interface print
     "/tool sniffer quick protocol=tcp duration=30",
 
-    # Logs
-    '/log print where message~"firewall" count=100',
-    '/log print where message~"ovpn" count=50',
-    '/log print where message~"wireguard" count=50',
-    "/log print follow=no count=500 without-paging",
+    # Logs - RouterOS v7 doesn't support count= parameter
+    '/log print where message~"firewall" without-paging',
+    '/log print where message~"ovpn" without-paging',
+    '/log print where message~"wireguard" without-paging',
+    "/log print follow=no without-paging",
 
     # Connectivity Tests
     "/ping 8.8.8.8 count=5",

@@ -70,7 +70,7 @@ def parse_logs(results: List, count: int = 50) -> List[LogEntry]:
      0  12:30:45 system,info,account user admin logged in from 192.168.1.100
      1  12:30:40 firewall,info,drop in:ether1 out: (none), src-mac 00:11:22:33:44:55, proto TCP (SYN), 192.168.1.100:54321->10.0.0.1:80, len 60
 
-    Или detail формат:
+    Или detail формат (RouterOS v7):
      0  time=12:30:45 topics=system,info,account message="user admin logged in"
     """
     entries: list[dict] = []
@@ -89,7 +89,7 @@ def parse_logs(results: List, count: int = 50) -> List[LogEntry]:
 
         entry = LogEntry()
 
-        # Пробуем парсить detail формат (time=, topics=, message=)
+        # RouterOS v7 detail формат (time=, topics=, message=)
         if 'time=' in line or 'topics=' in line:
             data = _parse_key_value_line(line)
             entry.time = data.get('time', '')
