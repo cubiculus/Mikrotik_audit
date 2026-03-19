@@ -3,9 +3,9 @@
 import logging
 import re
 from typing import List, Tuple, Dict, Optional
-from functools import lru_cache
 
 from src.models import IPAddress, NetworkOverview
+from src.parsers.utils import parse_key_value_line
 
 logger = logging.getLogger(__name__)
 
@@ -13,55 +13,6 @@ logger = logging.getLogger(__name__)
 COMMENT_PATTERN = re.compile(r'^\s*;;;\s*(.*)$')
 ENTRY_START_PATTERN = re.compile(r'^\s*(\d+)\s+(?:([A*DX]+)\s+)?(.*)$')
 CONTINUATION_PATTERN = re.compile(r'^\s{6,}|\t')
-
-
-@lru_cache(maxsize=256)
-def _parse_ip_data_cached(line: str) -> dict:
-    """Кэшированная функция для парсинга строки IP адреса в словарь."""
-    address_data = {}
-    i = 0
-    n = len(line)
-
-    while i < n:
-        # Skip whitespace
-        while i < n and line[i].isspace():
-            i += 1
-        if i >= n:
-            break
-
-        # Find key
-        key_start = i
-        while i < n and line[i] != '=':
-            i += 1
-        key = line[key_start:i]
-
-        if i >= n or line[i] != '=':
-            break
-        i += 1  # Skip '='
-
-        # Skip whitespace after '='
-        while i < n and line[i].isspace():
-            i += 1
-        if i >= n:
-            break
-
-        # Find value (handle quoted strings)
-        if line[i] == '"':
-            value_start = i + 1
-            i = value_start
-            while i < n and line[i] != '"':
-                i += 1
-            value = line[value_start:i]
-            i += 1  # Skip closing quote
-        else:
-            value_start = i
-            while i < n and not line[i].isspace():
-                i += 1
-            value = line[value_start:i]
-
-        address_data[key] = value
-
-    return address_data
 
 
 def _parse_ip_blocks(output: str) -> List[Dict[str, str]]:
@@ -122,7 +73,7 @@ def _parse_ip_blocks(output: str) -> List[Dict[str, str]]:
                 continue
 
             if rest and 'address=' in rest:
-                current_data = _parse_ip_data_cached(rest)
+                current_data = parse_key_value_line(rest)
                 has_address = True
             i += 1
             continue
@@ -130,7 +81,7 @@ def _parse_ip_blocks(output: str) -> List[Dict[str, str]]:
         # Проверяем продолжение (строка с отступом и key=value)
         if (line.startswith('      ') or line.startswith('\t')) and '=' in line:
             if current_data is not None:
-                data = _parse_ip_data_cached(line)
+                data = parse_key_value_line(line)
                 current_data.update(data)
                 if 'address' in data:
                     has_address = True
@@ -145,7 +96,7 @@ def _parse_ip_blocks(output: str) -> List[Dict[str, str]]:
                 addresses.append(current_data)
 
             current_comment = None
-            current_data = _parse_ip_data_cached(stripped)
+            current_data = parse_key_value_line(stripped)
             has_address = True
             i += 1
             continue
@@ -184,7 +135,8 @@ def parse_ip_address_results(ip_results: List) -> Tuple[List[IPAddress], Network
         ip_addr.address = address_data.get('address', '')
         ip_addr.network = address_data.get('network', '')
         ip_addr.interface = address_data.get('interface', '')
-        ip_addr.actual_interface = address_data.get('actual-interface', '')
+        # parse_key_value_line заменяет '-' на '_', поэтому используем actual_interface
+        ip_addr.actual_interface = address_data.get('actual_interface', address_data.get('actual-interface', ''))
         ip_addr.comment = address_data.get('comment', '')
 
         ip_addresses.append(ip_addr)

@@ -59,9 +59,7 @@ class BackupManager:
             )
 
             logger.debug(
-                f"Backup command result: exit_status={exit_status}, "
-                f"output='{output[:200] if output else 'empty'}', "
-                f"stderr='{stderr[:200] if stderr else 'empty'}'"
+                f"Backup command exit status: {exit_status}"
             )
 
             # RouterOS 7.4+ may require dont-encrypt=yes when encryption policy
@@ -81,10 +79,7 @@ class BackupManager:
                     exit_status, output, stderr = self.ssh.execute_command(
                         f"/system backup save name=audit_backup_{backup_timestamp} dont-encrypt=yes"
                     )
-                    logger.debug(
-                        f"Retry result: exit_status={exit_status}, "
-                        f"output='{output[:200] if output else 'empty'}'"
-                    )
+                    logger.debug(f"Retry backup command exit status: {exit_status}")
 
             # Check for permission denied or other errors
             if exit_status != 0:
@@ -217,11 +212,23 @@ class BackupManager:
                 except Exception as list_err:
                     logger.warning(f"Could not list remote files: {list_err}")
 
+                # Validate file extension is .backup
+                if not filename.lower().endswith('.backup'):
+                    logger.error(
+                        f"Security: File '{filename}' is not a .backup file. "
+                        f"Refusing to download."
+                    )
+                    backup_result.download_error = "Security: Invalid file type"
+                    return backup_result
+
                 local_path = output_dir / filename
                 output_dir.mkdir(parents=True, exist_ok=True)
 
-                sftp.get(filename, str(local_path))
-                sftp.close()
+                # Download using context manager for proper cleanup
+                try:
+                    sftp.get(filename, str(local_path))
+                finally:
+                    sftp.close()
 
                 if local_path.exists():
                     logger.info(
@@ -237,7 +244,7 @@ class BackupManager:
             logger.warning(f"Failed to download backup file: {e}")
             backup_result.download_error = str(e)
 
-    def _cleanup_backup(self, filename: str):
+    def _cleanup_backup(self, filename: str) -> None:
         """Delete backup file from router. Handles permission errors gracefully."""
         logger.info("Cleaning up backup file from router...")
 

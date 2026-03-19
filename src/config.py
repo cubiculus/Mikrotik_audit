@@ -1,8 +1,9 @@
 # Configuration file for MikroTik Audit
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 import os
+import ipaddress
 
 # Note: load_dotenv() is called in cli.py with absolute path to project root
 
@@ -23,9 +24,19 @@ class RouterConfig(BaseModel):
     timeout_per_command: Optional[int] = None  # Optional per-command timeout (overrides command_timeout)
     max_retries: int = 3
 
+    @field_validator('router_ip')
+    @classmethod
+    def validate_router_ip(cls, v: str) -> str:
+        """Validate router IP address is a valid IPv4 or IPv6 address."""
+        try:
+            ipaddress.ip_address(v)
+        except ValueError as e:
+            raise ValueError(f"Invalid router IP address: {v}. Error: {e}")
+        return v
+
     @field_validator('ssh_port')
     @classmethod
-    def validate_ssh_port(cls, v):
+    def validate_ssh_port(cls, v: int) -> int:
         """Validate SSH port is in valid range (1-65535)."""
         if not 1 <= v <= 65535:
             raise ValueError(f"SSH port must be between 1 and 65535, got {v}")
@@ -33,7 +44,7 @@ class RouterConfig(BaseModel):
 
     @field_validator('connect_timeout', 'command_timeout', 'timeout_per_command', 'max_retries')
     @classmethod
-    def validate_positive_integers(cls, v, field):
+    def validate_positive_integers(cls, v: Optional[int], field) -> Optional[int]:
         """Validate timeout and retry values are positive."""
         if v is not None and v <= 0:
             raise ValueError(f"{field.field_name} must be positive, got {v}")
@@ -70,7 +81,9 @@ class SecurityIssue(BaseModel):
     recommendation: str
     command: str = ""
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
+        """Initialize SecurityIssue with backward compatibility for finding/description fields."""
+        # Handle backward compatibility for finding/description fields
         if 'finding' not in data and 'description' in data:
             data['finding'] = data['description']
         elif 'description' not in data and 'finding' in data:
@@ -204,7 +217,7 @@ def redact_sensitive_data(text: str) -> str:
     # - 169.254.0.0/16 (link-local)
     # - 224.0.0.0/4 (multicast)
 
-    def _is_private_ip(match):
+    def _is_private_ip(match: Any) -> bool:
         """Check if matched IP is in private range."""
         ip = match.group(0)
         try:
@@ -243,7 +256,7 @@ def redact_sensitive_data(text: str) -> str:
             return False
 
     # Match IP addresses and filter out private ones
-    def _mask_public_ip(match):
+    def _mask_public_ip(match: Any) -> str:
         """Mask the IP if it's public, keep it if private."""
         if _is_private_ip(match):
             return match.group(0)  # Keep private IPs unchanged

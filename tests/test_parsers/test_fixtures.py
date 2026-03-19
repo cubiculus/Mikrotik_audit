@@ -78,19 +78,19 @@ Columns: NAME, RX-BYTE, TX-BYTE, RX-PACKET
 INTERFACE_DETAIL_OUTPUT = """Flags: X - DISABLED; R - RUNNING; S - SLAVE
 
  0  R  ;;; ether1 - WAN
-      name="ether1" type="ether" mtu=1500 l2mtu=2028 mac-address=00:00:00:00:00:01
+      name="ether1" type="ether" mtu=1500 l2mtu=2028 mac-address=AA:BB:CC:DD:EE:01
       running=yes disabled=no
 
  1 X S ;;; ether2 - LAN (slave)
-      name="ether2" type="ether" mtu=1500 l2mtu=2028 mac-address=00:00:00:00:00:02
+      name="ether2" type="ether" mtu=1500 l2mtu=2028 mac-address=AA:BB:CC:DD:EE:02
       running=yes disabled=yes
 
  5  RS ;;; VETH for Container 1
-      name="CONTAINER1-TUN" type="veth" mtu=1500 mac-address=00:00:00:00:00:05
+      name="CONTAINER1-TUN" type="veth" mtu=1500 mac-address=AA:BB:CC:DD:EE:05
       running=yes disabled=no rx-byte=36552256 tx-byte=47124055
 
  6  R  ;;; Bridge for Container 1
-      name="CONTAINER1-BR" type="bridge" mtu=1500 mac-address=00:00:00:00:00:06
+      name="CONTAINER1-BR" type="bridge" mtu=1500 mac-address=AA:BB:CC:DD:EE:06
       running=yes disabled=no rx-byte=31094092 tx-byte=46656533
 """
 
@@ -232,9 +232,9 @@ VETH_DETAIL_OUTPUT = """Flags: X - DISABLED; R - RUNNING
 
  0  R ;;; VETH for Container 1
 
-      name="CONTAINER1-TUN" mac-address=00:00:00:00:00:05
+      name="CONTAINER1-TUN" mac-address=AA:BB:CC:DD:EE:05
 
-      container-mac-address=00:00:00:00:00:06 address=192.168.3.1/24
+      container-mac-address=AA:BB:CC:DD:EE:06 address=192.168.3.1/24
 
       gateway=192.168.3.2 gateway6="" dhcp=no dhcp-address=""
 
@@ -242,9 +242,9 @@ VETH_DETAIL_OUTPUT = """Flags: X - DISABLED; R - RUNNING
 
  1  R ;;; VETH for Container 2
 
-      name="CONTAINER2-TUN" mac-address=00:00:00:00:00:07
+      name="CONTAINER2-TUN" mac-address=AA:BB:CC:DD:EE:07
 
-      container-mac-address=00:00:00:00:00:08 address="" gateway=""
+      container-mac-address=AA:BB:CC:DD:EE:08 address="" gateway=""
 
       gateway6="" dhcp=no dhcp-address=""
 
@@ -252,9 +252,9 @@ VETH_DETAIL_OUTPUT = """Flags: X - DISABLED; R - RUNNING
 
  2  R ;;; VETH for Container 3
 
-      name="CONTAINER3-TUN" mac-address=00:00:00:00:00:09
+      name="CONTAINER3-TUN" mac-address=AA:BB:CC:DD:EE:09
 
-      container-mac-address=00:00:00:00:00:0A address=192.168.4.3/24
+      container-mac-address=AA:BB:CC:DD:EE:0A address=192.168.4.3/24
 
       gateway=192.168.4.1 gateway6="" dhcp=no dhcp-address=""
 """

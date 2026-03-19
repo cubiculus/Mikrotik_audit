@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import List, Any, Optional
 from collections import OrderedDict
+from threading import Lock
 
 from src.config import CommandResult
 from src.models import NetworkOverview
@@ -54,19 +55,23 @@ class DataParser:
         # Use OrderedDict for O(1) LRU operations
         self._memory_cache: OrderedDict[str, Any] = OrderedDict()
         self._max_cache_size = 100
+        # Thread-safe lock for cache operations
+        self._cache_lock = Lock()
 
     def _get_cache_key(self, command_output: str) -> str:
         """Generate cache key based on content using SHA256."""
         return hashlib.sha256(command_output.encode()).hexdigest()
 
-    def _get_from_cache(self, cache_key: str):
-        """Retrieve data from cache with O(1) operations."""
-        if cache_key in self._memory_cache:
-            # Move to end to mark as recently used (O(1) with OrderedDict)
-            self._memory_cache.move_to_end(cache_key)
-            logger.debug(f"Cache hit (memory): {cache_key[:8]}")
-            return self._memory_cache[cache_key]
+    def _get_from_cache(self, cache_key: str) -> Any:
+        """Retrieve data from cache with O(1) operations and thread safety."""
+        with self._cache_lock:
+            if cache_key in self._memory_cache:
+                # Move to end to mark as recently used (O(1) with OrderedDict)
+                self._memory_cache.move_to_end(cache_key)
+                logger.debug(f"Cache hit (memory): {cache_key[:8]}")
+                return self._memory_cache[cache_key]
 
+        # Check disk cache outside of lock (file I/O is slow)
         cache_file = self.cache_dir / f"{cache_key}.json"
         if cache_file.exists():
             logger.debug(f"Cache hit (disk): {cache_key[:8]}")
@@ -74,20 +79,21 @@ class DataParser:
                 return json.load(f)
         return None
 
-    def _save_to_cache(self, cache_key: str, data, persist: bool = False):
-        """Save data to cache with O(1) LRU eviction."""
-        # Memory cache with LRU eviction using OrderedDict
-        if cache_key not in self._memory_cache and len(self._memory_cache) >= self._max_cache_size:
-            # Evict least recently used item (first item in OrderedDict)
-            lru_key = next(iter(self._memory_cache))
-            del self._memory_cache[lru_key]
-            logger.debug(f"Evicted LRU cache entry: {lru_key[:8]}")
+    def _save_to_cache(self, cache_key: str, data: Any, persist: bool = False) -> None:
+        """Save data to cache with O(1) LRU eviction and thread safety."""
+        # Memory cache with LRU eviction using OrderedDict (thread-safe)
+        with self._cache_lock:
+            if cache_key not in self._memory_cache and len(self._memory_cache) >= self._max_cache_size:
+                # Evict least recently used item (first item in OrderedDict)
+                lru_key = next(iter(self._memory_cache))
+                del self._memory_cache[lru_key]
+                logger.debug(f"Evicted LRU cache entry: {lru_key[:8]}")
 
-        # Update access order - move to end if exists, or add to end
-        self._memory_cache[cache_key] = data
-        self._memory_cache.move_to_end(cache_key)
+            # Update access order - move to end if exists, or add to end
+            self._memory_cache[cache_key] = data
+            self._memory_cache.move_to_end(cache_key)
 
-        # Disk cache if persist is True
+        # Disk cache if persist is True (outside of lock to avoid blocking)
         if persist:
             cache_file = self.cache_dir / f"{cache_key}.json"
             with open(cache_file, 'w', encoding='utf-8') as f:

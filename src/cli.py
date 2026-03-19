@@ -213,10 +213,6 @@ def main(
         if dry_run:
             # For dry-run, use empty password if not provided
             ssh_pass = os.getenv("MIKROTIK_PASSWORD", "")
-            if ssh_pass:
-                logger.debug(f"Password loaded from environment variable (length: {len(ssh_pass)})")
-            else:
-                logger.debug("No password provided (dry-run mode)")
 
             config = AuditConfig(
                 router=RouterConfig(

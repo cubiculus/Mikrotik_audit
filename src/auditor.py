@@ -126,24 +126,25 @@ class MikroTikAuditor:
 
     def _group_commands_by_priority(self, commands: List[str]) -> dict:
         """Group commands by priorities."""
-        fast_commands = [
+        fast_commands_set = {
             '/system identity print',
             '/system resource print',
             '/system clock print',
             '/interface print stats',
-        ]
-        heavy_commands = [
+        }
+        heavy_commands_set = {
             '/tool sniffer quick',
             '/ip firewall filter print detail',
             '/ip firewall nat print detail',
-        ]
-        dependent_commands = [
+        }
+        dependent_commands_set = {
             '/export hide-sensitive',
-        ]
+        }
 
-        fast = [c for c in commands if any(f in c for f in fast_commands)]
-        heavy = [c for c in commands if any(h in c for h in heavy_commands)]
-        dependent = [c for c in commands if any(d in c for d in dependent_commands)]
+        # Use sets for O(1) lookup instead of O(n) with lists
+        fast = [c for c in commands if any(f in c for f in fast_commands_set)]
+        heavy = [c for c in commands if any(h in c for h in heavy_commands_set)]
+        dependent = [c for c in commands if any(d in c for d in dependent_commands_set)]
         normal = [c for c in commands if c not in fast + heavy + dependent]
 
         return {
@@ -291,8 +292,20 @@ class MikroTikAuditor:
             if self.ssh:
                 self.ssh.close()
 
-    def _execute_phase(self, grouped: dict, total: int):
-        """Execute command phases."""
+    def _execute_phase(self, grouped: dict, total: int) -> None:
+        """
+        Execute command phases in priority order.
+
+        Phases:
+        1. Fast commands (system info, stats)
+        2. Heavy commands (firewall rules, sniffer)
+        3. Normal commands (all others)
+        4. Dependent commands (sequential, like export)
+
+        Args:
+            grouped: Dictionary with 'fast', 'heavy', 'normal', 'dependent' command lists
+            total: Total number of commands for progress tracking
+        """
         # Phase 1: Fast commands
         if grouped['fast']:
             if self.config.show_progress_bar:

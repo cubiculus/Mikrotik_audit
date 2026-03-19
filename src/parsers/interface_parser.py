@@ -3,9 +3,9 @@
 import logging
 import re
 from typing import List, Tuple, Dict, Optional
-from functools import lru_cache
 
 from src.models import NetworkInterface, NetworkOverview
+from src.parsers.utils import parse_key_value_line
 
 logger = logging.getLogger(__name__)
 
@@ -14,55 +14,6 @@ COMMENT_PATTERN = re.compile(r'^\s*;;;\s*(.*)$')
 # Формат: "*1  R  name=ether1" или " 0  R  name=ether1"
 ENTRY_START_PATTERN = re.compile(r'^\s*(\*?\d+)\s+(?:([A-Z]+)\s+)?(.*)$')
 CONTINUATION_PATTERN = re.compile(r'^\s{6,}|\t')
-
-
-@lru_cache(maxsize=256)
-def _parse_interface_data_cached(line: str) -> dict:
-    """Кэшированная функция для парсинга строки интерфейса в словарь."""
-    interface_data = {}
-    i = 0
-    n = len(line)
-
-    while i < n:
-        # Skip whitespace
-        while i < n and line[i].isspace():
-            i += 1
-        if i >= n:
-            break
-
-        # Find key
-        key_start = i
-        while i < n and line[i] != '=':
-            i += 1
-        key = line[key_start:i]
-
-        if i >= n or line[i] != '=':
-            break
-        i += 1  # Skip '='
-
-        # Skip whitespace after '='
-        while i < n and line[i].isspace():
-            i += 1
-        if i >= n:
-            break
-
-        # Find value (handle quoted strings)
-        if line[i] == '"':
-            value_start = i + 1
-            i = value_start
-            while i < n and line[i] != '"':
-                i += 1
-            value = line[value_start:i]
-            i += 1  # Skip closing quote
-        else:
-            value_start = i
-            while i < n and not line[i].isspace():
-                i += 1
-            value = line[value_start:i]
-
-        interface_data[key] = value
-
-    return interface_data
 
 
 def _safe_int(value: str, default: int = 0) -> int:
@@ -138,7 +89,7 @@ def _parse_detail_blocks(output: str) -> Dict[str, dict]:
 
             # Ищем name= в этой строке
             if 'name=' in rest:
-                data = _parse_interface_data_cached(rest)
+                data = parse_key_value_line(rest)
                 if 'name' in data:
                     current_name = data['name']
                     current_data = data
@@ -148,7 +99,7 @@ def _parse_detail_blocks(output: str) -> Dict[str, dict]:
         # Проверяем продолжение (строка с отступом 4+ пробелов или tab)
         if (line.startswith('      ') or line.startswith('\t')) and '=' in line:
             # Это продолжение текущей записи или начало новой если current_name ещё не установлен
-            data = _parse_interface_data_cached(line)
+            data = parse_key_value_line(line)
             if 'name' in data:
                 current_name = data['name']
                 current_data = data
@@ -159,7 +110,7 @@ def _parse_detail_blocks(output: str) -> Dict[str, dict]:
 
         # Строка с меньшим отступом но с key=value (может быть частью записи)
         if line.startswith('  ') and '=' in line and current_name is not None:
-            data = _parse_interface_data_cached(line)
+            data = parse_key_value_line(line)
             current_data.update(data)
             if 'name' in data and not current_name:
                 current_name = data['name']
@@ -221,25 +172,25 @@ def _parse_stats_blocks(output: str) -> Dict[str, dict]:
                 if entry_match:
                     rest = entry_match.group(3) or ''
                     if 'name=' in rest:
-                        data = _parse_interface_data_cached(rest)
+                        data = parse_key_value_line(rest)
                         if 'name' in data:
                             name = data['name']
                             stats[name] = {
-                                'rx-byte': data.get('rx-byte', '0'),
-                                'tx-byte': data.get('tx-byte', '0'),
-                                'rx-packet': data.get('rx-packet', '0'),
-                                'tx-packet': data.get('tx-packet', '0'),
+                                'rx-byte': data.get('rx_byte', '0'),
+                                'tx-byte': data.get('tx_byte', '0'),
+                                'rx-packet': data.get('rx_packet', '0'),
+                                'tx-packet': data.get('tx_packet', '0'),
                             }
                 elif 'name=' in line:
                     # Просто строка с key=value
-                    data = _parse_interface_data_cached(line)
+                    data = parse_key_value_line(line)
                     if 'name' in data:
                         name = data['name']
                         stats[name] = {
-                            'rx-byte': data.get('rx-byte', '0'),
-                            'tx-byte': data.get('tx-byte', '0'),
-                            'rx-packet': data.get('rx-packet', '0'),
-                            'tx-packet': data.get('tx-packet', '0'),
+                            'rx-byte': data.get('rx_byte', '0'),
+                            'tx-byte': data.get('tx_byte', '0'),
+                            'rx-packet': data.get('rx_packet', '0'),
+                            'tx-packet': data.get('tx_packet', '0'),
                         }
 
     return stats
@@ -385,7 +336,8 @@ def parse_interface_stats(interface_results: List) -> Tuple[List[NetworkInterfac
         interface.tx_byte = _safe_int(tx_byte_str.replace(' ', ''))
         interface.rx_packet = _safe_int(rx_packet_str.replace(' ', ''))
         interface.tx_packet = _safe_int(tx_packet_str.replace(' ', ''))
-        interface.mac_address = data.get('mac-address', '')
+        # parse_key_value_line заменяет '-' на '_', поэтому используем mac_address
+        interface.mac_address = data.get('mac_address', data.get('mac-address', ''))
 
         interfaces.append(interface)
         logger.debug(f"Parsed interface: {interface.name}, running: {interface.running}")

@@ -5,7 +5,7 @@ import logging
 import re
 import os
 import stat
-from typing import Tuple
+from typing import Any, Tuple
 from contextlib import contextmanager
 from queue import Queue, Empty
 from threading import Lock
@@ -67,7 +67,7 @@ class SSHConnectionError(Exception):
 class SSHConnectionPool:
     """Пул SSH-соединений для переиспользования."""
 
-    def __init__(self, config, max_connections: int = 3):
+    def __init__(self, config: RouterConfig, max_connections: int = 3) -> None:
         self.config = config
         self.max_connections = max_connections
         self._pool: Queue = Queue(maxsize=max_connections)
@@ -76,7 +76,7 @@ class SSHConnectionPool:
         self._issued_connections: set[int] = set()  # Track connections currently in use
 
     @contextmanager
-    def get_connection(self):
+    def get_connection(self) -> Any:
         """Получить соединение из пула."""
         conn = None
 
@@ -177,9 +177,9 @@ class SSHConnectionPool:
     def _create_connection(self) -> paramiko.SSHClient:
         """Create a new SSH connection with validated credentials."""
         client = paramiko.SSHClient()
-        # AutoAddPolicy adds unknown host keys (for first connection)
-        # For production use, consider RejectPolicy with pre-saved known_hosts
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
+        # RejectPolicy prevents MITM attacks by rejecting unknown host keys
+        # Host keys must be pre-added to known_hosts file for security
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
 
         try:
             # Prepare connection parameters
@@ -238,7 +238,7 @@ class SSHConnectionPool:
             logger.debug(f"Connection check failed: {e}")
         return False
 
-    def close_all(self):
+    def close_all(self) -> None:
         """Close all connections including those currently in use."""
         # Close all connections in the pool
         while not self._pool.empty():

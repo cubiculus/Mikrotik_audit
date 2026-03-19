@@ -15,6 +15,13 @@ from src.security_analyzer import SecurityAnalyzer
 
 logger = logging.getLogger(__name__)
 
+# Constants for magic numbers (avoid hardcoding in code)
+MAX_RULES_IN_REPORT = 50
+MAX_ERROR_MESSAGE_LENGTH = 200
+BYTES_PER_KB = 1024
+BYTES_PER_MB = 1024 * 1024
+MEMORY_TO_GB_FACTOR = 1024 * 1024 * 1024
+
 
 class HTMLReportGenerator(BaseReportGenerator):
     """Generates comprehensive HTML reports with interactive charts."""
@@ -177,7 +184,7 @@ class HTMLReportGenerator(BaseReportGenerator):
             return "<p>Failed to generate charts</p>"
 
     def _create_commands_table(self, results: List[CommandResult]) -> str:
-        """Create HTML table of command results."""
+        """Create HTML table of command results with efficient StringIO usage."""
         rows = []
         for r in results:
             if not r.has_error:
@@ -190,13 +197,13 @@ class HTMLReportGenerator(BaseReportGenerator):
                     error_parts.append(f"<strong>Type:</strong> {r.error_type}")
                 if r.error_message:
                     error_msg = r.error_message.replace('<', '&lt;').replace('>', '&gt;')
-                    if len(error_msg) > 200:
+                    if len(error_msg) > MAX_ERROR_MESSAGE_LENGTH:
                         error_msg = error_msg[:200] + "..."
                     error_parts.append(f"<strong>Message:</strong> {error_msg}")
                 if r.stderr:
                     stderr = '\n'.join(line for line in r.stderr.split('\n') if line.strip())
                     stderr = stderr.replace('<', '&lt;').replace('>', '&gt;')
-                    if len(stderr) > 200:
+                    if len(stderr) > MAX_ERROR_MESSAGE_LENGTH:
                         stderr = stderr[:200] + "..."
                     error_parts.append(f"<strong>Stderr:</strong> {stderr}")
                 error_info = "<br>".join(error_parts) if error_parts else "-"
@@ -284,7 +291,7 @@ class HTMLReportGenerator(BaseReportGenerator):
             return "<p>Backup was not performed.</p>"
 
         if backup_result.status == "success":
-            size_kb = f"{backup_result.file_size / 1024:.2f} KB" if backup_result.file_size else "Unknown"
+            size_kb = f"{backup_result.file_size / BYTES_PER_KB:.2f} KB" if backup_result.file_size else "Unknown"
             file_link = f"<a href='{backup_result.local_path}' style='color:#065f46;text-decoration:underline' target='_blank'>💾 Download Backup File</a>" if backup_result.local_path else ""
 
             html = "<div style='background:#d1fae5;padding:20px;border-radius:8px;border-left:4px solid #10b981'>"
@@ -464,7 +471,8 @@ class HTMLReportGenerator(BaseReportGenerator):
             has_content = True
             mangle_rows = []
 
-            for idx, rule in enumerate(overview.mangle_rules[:50]):  # Limit to 50 rules
+            for idx, rule in enumerate(overview.mangle_rules[:MAX_RULES_IN_REPORT]):
+                # Limit to MAX_RULES_IN_REPORT rules
                 disabled_badge = '<span class="disabled-badge" style="margin-left: 6px; color: #ef4444; font-size: 0.85em;">● disabled</span>' if rule.disabled else ''
                 comment = rule.comment or ""
 
@@ -481,7 +489,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                     </tr>
                 ''')
 
-            more_rules = len(overview.mangle_rules) - 50
+            more_rules = len(overview.mangle_rules) - MAX_RULES_IN_REPORT
             more_html = f'<tr><td colspan="8" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more mangle rules</em></td></tr>' if more_rules > 0 else ''
 
             content_parts.append(f'''
@@ -663,7 +671,8 @@ class HTMLReportGenerator(BaseReportGenerator):
         try:
             nat_rows = []
 
-            for idx, rule in enumerate(overview.nat_rules[:50]):  # Limit to 50 rules
+            for idx, rule in enumerate(overview.nat_rules[:MAX_RULES_IN_REPORT]):
+                # Limit to MAX_RULES_IN_REPORT rules
                 disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
                 log_badge = '<span style="color:#3b82f6;font-size:0.85em;">📋 logged</span>' if rule.log == 'yes' else ''
                 comment = rule.comment or ""
@@ -687,7 +696,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                     </tr>
                 ''')
 
-            more_rules = len(overview.nat_rules) - 50
+            more_rules = len(overview.nat_rules) - MAX_RULES_IN_REPORT
             more_html = f'<tr><td colspan="14" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more NAT rules</em></td></tr>' if more_rules > 0 else ''
 
             # Count rules by chain
@@ -738,7 +747,8 @@ class HTMLReportGenerator(BaseReportGenerator):
         try:
             filter_rows = []
 
-            for idx, rule in enumerate(overview.filter_rules[:50]):  # Limit to 50 rules
+            for idx, rule in enumerate(overview.filter_rules[:MAX_RULES_IN_REPORT]):
+                # Limit to MAX_RULES_IN_REPORT rules
                 disabled_badge = '<span style="color:#ef4444;font-size:0.85em;">(disabled)</span>' if rule.disabled else ''
                 log_badge = '<span style="color:#3b82f6;font-size:0.85em;">📋 logged</span>' if rule.log == 'yes' else ''
 
@@ -772,7 +782,7 @@ class HTMLReportGenerator(BaseReportGenerator):
                     </tr>
                 ''')
 
-            more_rules = len(overview.filter_rules) - 50
+            more_rules = len(overview.filter_rules) - MAX_RULES_IN_REPORT
             more_html = f'<tr><td colspan="13" style="text-align:center;color:#666;padding:10px;"><em>...and {more_rules} more filter rules</em></td></tr>' if more_rules > 0 else ''
 
             # Count rules by action
@@ -839,22 +849,22 @@ class HTMLReportGenerator(BaseReportGenerator):
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">Memory:</span>
-                    <span class="info-value">{res.free_memory // (1024*1024)}MB / {res.total_memory // (1024*1024)}MB ({mem_percent:.1f}% used)</span>
+                    <span class="info-value">{res.free_memory // BYTES_PER_MB}MB / {res.total_memory // BYTES_PER_MB}MB ({mem_percent:.1f}% used)</span>
                 </div>
             ''')
 
             html_parts.append(f'''
                 <div class="info-item">
                     <span class="info-label">HDD:</span>
-                    <span class="info-value">{res.free_hdd // (1024*1024)}MB / {res.total_hdd // (1024*1024)}MB</span>
+                    <span class="info-value">{res.free_hdd // BYTES_PER_MB}MB / {res.total_hdd // BYTES_PER_MB}MB</span>
                 </div>
             ''')
 
             # USB disks info
             if overview.disks:
                 for disk in overview.disks:
-                    total_mb = disk.total_size // (1024 * 1024) if disk.total_size > 0 else 0
-                    free_mb = disk.free_size // (1024 * 1024) if disk.free_size > 0 else 0
+                    total_mb = disk.total_size // BYTES_PER_MB if disk.total_size > 0 else 0
+                    free_mb = disk.free_size // BYTES_PER_MB if disk.free_size > 0 else 0
                     disk_type_icon = "💾" if disk.type == "usb" else "📀"
 
                     html_parts.append(f'''

@@ -3,9 +3,9 @@
 import logging
 import re
 from typing import List, Dict, Set, Optional
-from functools import lru_cache
 
 from src.models import NATRule, FilterRule, MangleRule
+from src.parsers.utils import parse_key_value_line
 
 logger = logging.getLogger(__name__)
 
@@ -37,68 +37,11 @@ MANGLE_KNOWN_FIELDS = {
 }
 
 
-@lru_cache(maxsize=512)
-def _parse_rule_line_cached(line: str) -> Dict[str, str]:
-    """Кэшированная функция для парсинга строки правила в словарь.
-
-    Handles values with spaces by respecting quoted strings.
-    """
-    # Remove leading whitespace from RouterOS v7 format
-    line = line.lstrip()
-
-    rule_dict = {}
-    i = 0
-    n = len(line)
-
-    while i < n:
-        # Skip whitespace
-        while i < n and line[i].isspace():
-            i += 1
-
-        if i >= n:
-            break
-
-        # Find key
-        key_start = i
-        while i < n and line[i] != '=':
-            i += 1
-        key = line[key_start:i]
-
-        if i >= n or line[i] != '=':
-            break
-        i += 1  # Skip '='
-
-        # Skip whitespace after '='
-        while i < n and line[i].isspace():
-            i += 1
-
-        if i >= n:
-            break
-
-        # Find value (handle quoted strings)
-        if line[i] == '"':
-            # Quoted value
-            value_start = i + 1
-            i = value_start
-            while i < n and line[i] != '"':
-                i += 1
-            value = line[value_start:i]
-            i += 1  # Skip closing quote
-        else:
-            # Unquoted value (read until next whitespace)
-            value_start = i
-            while i < n and not line[i].isspace():
-                i += 1
-            value = line[value_start:i]
-
-        rule_dict[key] = value
-
-    return rule_dict
-
-
 def _parse_rule_line(line: str) -> Dict[str, str]:
     """Парсинг строки правила в словарь."""
-    return _parse_rule_line_cached(line)
+    # Remove leading whitespace from RouterOS v7 format
+    line = line.lstrip()
+    return parse_key_value_line(line)
 
 
 def _build_other_fields(rule_dict: Dict[str, str], known_fields: Set[str]) -> Dict[str, str]:
@@ -213,6 +156,7 @@ def parse_nat_rules(results: List) -> List[NATRule]:
             nat_rules_dicts.extend(rules)
 
     # Конвертируем словари в объекты NATRule
+    # parse_key_value_line заменяет '-' на '_', поэтому используем ключи с '_'
     nat_rules = []
     for rule_dict in nat_rules_dicts:
         rule = NATRule()
@@ -220,19 +164,19 @@ def parse_nat_rules(results: List) -> List[NATRule]:
         rule.action = rule_dict.get('action', '')
         rule.disabled = rule_dict.get('disabled', 'no') == 'yes'
         rule.comment = rule_dict.get('comment', '')
-        rule.src_address = rule_dict.get('src-address', '')
-        rule.dst_address = rule_dict.get('dst-address', '')
-        rule.src_address_list = rule_dict.get('src-address-list', '')
-        rule.dst_address_list = rule_dict.get('dst-address-list', '')
+        rule.src_address = rule_dict.get('src_address', rule_dict.get('src-address', ''))
+        rule.dst_address = rule_dict.get('dst_address', rule_dict.get('dst-address', ''))
+        rule.src_address_list = rule_dict.get('src_address_list', rule_dict.get('src-address-list', ''))
+        rule.dst_address_list = rule_dict.get('dst_address_list', rule_dict.get('dst-address-list', ''))
         rule.protocol = rule_dict.get('protocol', '')
-        rule.src_port = rule_dict.get('src-port', '')
-        rule.dst_port = rule_dict.get('dst-port', '')
-        rule.to_addresses = rule_dict.get('to-addresses', '')
-        rule.to_ports = rule_dict.get('to-ports', '')
-        rule.out_interface = rule_dict.get('out-interface', '')
-        rule.in_interface = rule_dict.get('in-interface', '')
-        rule.in_interface_list = rule_dict.get('in-interface-list', '')
-        rule.routing_mark = rule_dict.get('routing-mark', '')
+        rule.src_port = rule_dict.get('src_port', rule_dict.get('src-port', ''))
+        rule.dst_port = rule_dict.get('dst_port', rule_dict.get('dst-port', ''))
+        rule.to_addresses = rule_dict.get('to_addresses', rule_dict.get('to-addresses', ''))
+        rule.to_ports = rule_dict.get('to_ports', rule_dict.get('to-ports', ''))
+        rule.out_interface = rule_dict.get('out_interface', rule_dict.get('out-interface', ''))
+        rule.in_interface = rule_dict.get('in_interface', rule_dict.get('in-interface', ''))
+        rule.in_interface_list = rule_dict.get('in_interface_list', rule_dict.get('in-interface-list', ''))
+        rule.routing_mark = rule_dict.get('routing_mark', rule_dict.get('routing-mark', ''))
         rule.log = rule_dict.get('log', '')
         rule.other = {k: v for k, v in rule_dict.items() if k not in NAT_KNOWN_FIELDS}
         nat_rules.append(rule)
@@ -250,6 +194,7 @@ def parse_filter_rules(results: List) -> List[FilterRule]:
             filter_rules_dicts.extend(rules)
 
     # Конвертируем словари в объекты FilterRule
+    # parse_key_value_line заменяет '-' на '_', поэтому используем ключи с '_'
     filter_rules = []
     for rule_dict in filter_rules_dicts:
         rule = FilterRule()
@@ -257,25 +202,25 @@ def parse_filter_rules(results: List) -> List[FilterRule]:
         rule.action = rule_dict.get('action', '')
         rule.disabled = rule_dict.get('disabled', 'no') == 'yes'
         rule.comment = rule_dict.get('comment', '')
-        rule.src_address = rule_dict.get('src-address', '')
-        rule.dst_address = rule_dict.get('dst-address', '')
-        rule.src_address_list = rule_dict.get('src-address-list', '')
-        rule.dst_address_list = rule_dict.get('dst-address-list', '')
+        rule.src_address = rule_dict.get('src_address', rule_dict.get('src-address', ''))
+        rule.dst_address = rule_dict.get('dst_address', rule_dict.get('dst-address', ''))
+        rule.src_address_list = rule_dict.get('src_address_list', rule_dict.get('src-address-list', ''))
+        rule.dst_address_list = rule_dict.get('dst_address_list', rule_dict.get('dst-address-list', ''))
         rule.protocol = rule_dict.get('protocol', '')
-        rule.src_port = rule_dict.get('src-port', '')
-        rule.dst_port = rule_dict.get('dst-port', '')
-        rule.in_interface = rule_dict.get('in-interface', '')
-        rule.out_interface = rule_dict.get('out-interface', '')
-        rule.in_interface_list = rule_dict.get('in-interface-list', '')
-        rule.out_interface_list = rule_dict.get('out-interface-list', '')
-        rule.connection_state = rule_dict.get('connection-state', '')
-        rule.connection_nat_state = rule_dict.get('connection-nat-state', '')
-        rule.connection_type = rule_dict.get('connection-type', '')
+        rule.src_port = rule_dict.get('src_port', rule_dict.get('src-port', ''))
+        rule.dst_port = rule_dict.get('dst_port', rule_dict.get('dst-port', ''))
+        rule.in_interface = rule_dict.get('in_interface', rule_dict.get('in-interface', ''))
+        rule.out_interface = rule_dict.get('out_interface', rule_dict.get('out-interface', ''))
+        rule.in_interface_list = rule_dict.get('in_interface_list', rule_dict.get('in-interface-list', ''))
+        rule.out_interface_list = rule_dict.get('out_interface_list', rule_dict.get('out-interface-list', ''))
+        rule.connection_state = rule_dict.get('connection_state', rule_dict.get('connection-state', ''))
+        rule.connection_nat_state = rule_dict.get('connection_nat_state', rule_dict.get('connection-nat-state', ''))
+        rule.connection_type = rule_dict.get('connection_type', rule_dict.get('connection-type', ''))
         rule.log = rule_dict.get('log', '')
-        rule.log_prefix = rule_dict.get('log-prefix', '')
-        rule.packet_mark = rule_dict.get('packet-mark', '')
-        rule.connection_mark = rule_dict.get('connection-mark', '')
-        rule.routing_mark = rule_dict.get('routing-mark', '')
+        rule.log_prefix = rule_dict.get('log_prefix', rule_dict.get('log-prefix', ''))
+        rule.packet_mark = rule_dict.get('packet_mark', rule_dict.get('packet-mark', ''))
+        rule.connection_mark = rule_dict.get('connection_mark', rule_dict.get('connection-mark', ''))
+        rule.routing_mark = rule_dict.get('routing_mark', rule_dict.get('routing-mark', ''))
         rule.other = {k: v for k, v in rule_dict.items() if k not in FILTER_KNOWN_FIELDS}
         filter_rules.append(rule)
 
@@ -292,6 +237,7 @@ def parse_mangle_rules(results: List) -> List[MangleRule]:
             mangle_rules_dicts.extend(rules)
 
     # Конвертируем словари в объекты MangleRule
+    # parse_key_value_line заменяет '-' на '_', поэтому используем ключи с '_'
     mangle_rules = []
     for rule_dict in mangle_rules_dicts:
         rule = MangleRule()
@@ -299,16 +245,16 @@ def parse_mangle_rules(results: List) -> List[MangleRule]:
         rule.chain = rule_dict.get('chain', '')
         rule.disabled = rule_dict.get('disabled', 'no') == 'yes'
         rule.comment = rule_dict.get('comment', '')
-        rule.src_address = rule_dict.get('src-address', '')
-        rule.dst_address = rule_dict.get('dst-address', '')
-        rule.src_address_list = rule_dict.get('src-address-list', '')
-        rule.dst_address_list = rule_dict.get('dst-address-list', '')
+        rule.src_address = rule_dict.get('src_address', rule_dict.get('src-address', ''))
+        rule.dst_address = rule_dict.get('dst_address', rule_dict.get('dst-address', ''))
+        rule.src_address_list = rule_dict.get('src_address_list', rule_dict.get('src-address-list', ''))
+        rule.dst_address_list = rule_dict.get('dst_address_list', rule_dict.get('dst-address-list', ''))
         rule.protocol = rule_dict.get('protocol', '')
-        rule.dst_port = rule_dict.get('dst-port', '')
-        rule.src_port = rule_dict.get('src-port', '')
-        rule.new_connection_mark = rule_dict.get('new-connection-mark', '')
-        rule.new_routing_mark = rule_dict.get('new-routing-mark', '')
-        rule.routing_mark = rule_dict.get('routing-mark', '')
+        rule.dst_port = rule_dict.get('dst_port', rule_dict.get('dst-port', ''))
+        rule.src_port = rule_dict.get('src_port', rule_dict.get('src-port', ''))
+        rule.new_connection_mark = rule_dict.get('new_connection_mark', rule_dict.get('new-connection-mark', ''))
+        rule.new_routing_mark = rule_dict.get('new_routing_mark', rule_dict.get('new-routing-mark', ''))
+        rule.routing_mark = rule_dict.get('routing_mark', rule_dict.get('routing-mark', ''))
         rule.passthrough = rule_dict.get('passthrough', '')
         rule.other = {k: v for k, v in rule_dict.items() if k not in MANGLE_KNOWN_FIELDS}
         mangle_rules.append(rule)

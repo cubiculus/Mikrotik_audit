@@ -23,8 +23,8 @@ class TestDHCPParser:
     def test_parse_dynamic_lease(self):
         """Test parsing dynamic DHCP lease."""
         output = """Flags: D - DYNAMIC
- 0  D  192.168.100.100  D8:50:E6:52:8B:6A  Device1  dhcp1  23h18m47s  10m ago
-      address=192.168.100.100 mac-address=D8:50:E6:52:8B:6A host-name=Device1
+ 0  D  192.168.100.100  AA:BB:CC:DD:EE:6A  Device1  dhcp1  23h18m47s  10m ago
+      address=192.168.100.100 mac-address=AA:BB:CC:DD:EE:6A host-name=Device1
       server=dhcp1 expires-after=23h18m47s last-seen=10m ago
 """
         results = [CommandResult(index=0, command="/ip dhcp-server lease print detail", stdout=output)]
@@ -32,7 +32,7 @@ class TestDHCPParser:
 
         assert len(leases) == 1
         assert leases[0].address == "192.168.100.100"
-        assert leases[0].mac_address == "D8:50:E6:52:8B:6A"
+        assert leases[0].mac_address == "AA:BB:CC:DD:EE:6A"
         assert leases[0].host_name == "Device1"
         assert leases[0].dynamic is True
         assert leases[0].lease_status == "Dynamic"
@@ -56,8 +56,8 @@ class TestDHCPParser:
         """Test parsing DHCP lease with comment."""
         output = """Flags: D - DYNAMIC
  0  ;;; Device1 Storage
-    D  192.168.100.100  D8:50:E6:52:8B:6A  Device1  dhcp1  23h  10m ago
-      address=192.168.100.100 mac-address=D8:50:E6:52:8B:6A
+    D  192.168.100.100  AA:BB:CC:DD:EE:6A  Device1  dhcp1  23h  10m ago
+      address=192.168.100.100 mac-address=AA:BB:CC:DD:EE:6A
  1  ;;; Device2 Printer
        192.168.100.50  AA:BB:CC:DD:EE:01  Printer  dhcp1  never  1h ago
       address=192.168.100.50 mac-address=AA:BB:CC:DD:EE:01
