@@ -225,7 +225,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip route rule print detail",  # RouterOS v7: bad command name (use /routing rule)
     "/routing table print detail",
     "/routing table print",
-    "/routing filter print detail",  # Valid in RouterOS v7
+    # "/routing filter print detail",  # Fails on RouterOS v7.22
     "/routing vrf print detail",  # RouterOS v7: bad command name (use /ip vrf)
 
     # Routing Protocols - BGP
@@ -248,7 +248,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
 
     # DNS
     "/ip dns print",
-    "/ip dns print detail",  # Valid in RouterOS v7
+    # "/ip dns print detail",  # Fails on RouterOS v7.22 (expected end of command)
     "/ip dns cache print detail",
     "/ip dns static print detail",
 
@@ -342,7 +342,7 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/tool sniffer quick protocol=tcp duration=30",  # RouterOS v7: wrong syntax (use ip-protocol=, no duration in quick mode)
 
     # Logs - RouterOS v7 doesn't support count= parameter
-    "/log print without-paging",  # Valid in RouterOS v7
+    # "/log print without-paging",  # Fails on RouterOS v7.22 (expected end of command)
     '/log print where message~"firewall" without-paging',
     '/log print where message~"ovpn" without-paging',
     '/log print where message~"wireguard" without-paging',
