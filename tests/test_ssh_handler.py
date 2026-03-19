@@ -194,6 +194,89 @@ class TestSSHHandler:
             with pytest.raises(SSHConnectionError):
                 handler.execute_command("/test command")
 
+    def test_handler_execute_command_routeros_error_detection(self):
+        """Test that RouterOS errors in stdout are detected even with exit_status=0."""
+        config = RouterConfig()
+        handler = SSHHandler(config)
+
+        mock_conn = MagicMock()
+        mock_stdin = MagicMock()
+        mock_stdout = MagicMock()
+        mock_stderr = MagicMock()
+
+        mock_conn.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
+        # RouterOS returns exit_status=0 but with error message in stdout
+        mock_stdout.channel.recv_exit_status.return_value = 0
+        mock_stdout.read.return_value = b"expected end of command (line 1 column 17)"
+        mock_stderr.read.return_value = b""
+
+        with patch.object(handler.connection_pool, 'get_connection') as mock_get:
+            mock_get.return_value.__enter__.return_value = mock_conn
+
+            exit_status, stdout, stderr = handler.execute_command("/invalid command")
+
+            # Should detect error and return exit_status=1
+            assert exit_status == 1
+            assert "RouterOS error:" in stderr
+
+    def test_handler_execute_command_routeros_error_patterns(self):
+        """Test detection of various RouterOS error patterns."""
+        config = RouterConfig()
+        handler = SSHHandler(config)
+
+        error_messages = [
+            b"expected end of command",
+            b"bad command name",
+            b"no such item",
+            b"failure: no such item",
+            b"can not do that",
+            b"not enough permissions",
+            b"syntax error",
+        ]
+
+        for error_msg in error_messages:
+            mock_conn = MagicMock()
+            mock_stdin = MagicMock()
+            mock_stdout = MagicMock()
+            mock_stderr = MagicMock()
+
+            mock_conn.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
+            mock_stdout.channel.recv_exit_status.return_value = 0
+            mock_stdout.read.return_value = error_msg
+            mock_stderr.read.return_value = b""
+
+            with patch.object(handler.connection_pool, 'get_connection') as mock_get:
+                mock_get.return_value.__enter__.return_value = mock_conn
+
+                exit_status, stdout, stderr = handler.execute_command("/test")
+
+                assert exit_status == 1, f"Failed to detect error: {error_msg}"
+                assert "RouterOS error:" in stderr
+
+    def test_handler_execute_command_success_not_affected(self):
+        """Test that successful commands are not affected by validation."""
+        config = RouterConfig()
+        handler = SSHHandler(config)
+
+        mock_conn = MagicMock()
+        mock_stdin = MagicMock()
+        mock_stdout = MagicMock()
+        mock_stderr = MagicMock()
+
+        mock_conn.exec_command.return_value = (mock_stdin, mock_stdout, mock_stderr)
+        mock_stdout.channel.recv_exit_status.return_value = 0
+        mock_stdout.read.return_value = b" 0  R  name='test'"
+        mock_stderr.read.return_value = b""
+
+        with patch.object(handler.connection_pool, 'get_connection') as mock_get:
+            mock_get.return_value.__enter__.return_value = mock_conn
+
+            exit_status, stdout, stderr = handler.execute_command("/container print")
+
+            assert exit_status == 0
+            assert "RouterOS error:" not in stderr
+            assert stdout == " 0  R  name='test'"
+
     def test_handler_close(self):
         """Test closing handler."""
         config = RouterConfig()

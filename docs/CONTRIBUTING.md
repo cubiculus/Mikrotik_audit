@@ -88,21 +88,51 @@ def execute_command(self, command: str) -> Tuple[int, str, str]:
 ### Запуск тестов
 
 ```bash
-# Все тесты
-pytest
+# Все тесты (без роутера)
+pytest tests/ -v
 
 # С покрытием
-pytest --cov=. --cov-report=html
+pytest tests/ --cov=src --cov-report=html
 
 # Конкретный файл
-pytest test_config.py -v
+pytest tests/test_ssh_handler.py -v
 ```
 
-### Требования к тестам
+### Интеграционные тесты (требуется роутер)
 
-- Покрытие >80% для нового кода
-- Все тесты должны проходить
-- Используйте pytest fixtures
+```bash
+# Установите переменные окружения
+export MIKROTIK_PASSWORD="your_password"
+export MIKROTIK_IP="192.168.88.1"
+
+# Запуск интеграционных тестов
+pytest tests/test_integration/ -v -m integration
+```
+
+### Важность тестирования
+
+**Проблема:** RouterOS v7 может вернуть `exit_status=0` для ошибочных команд.
+
+**Пример:**
+```
+Command: /log print count=50
+Exit: 0  ← Ложный успех!
+Output: expected end of command (line 1 column 17)  ← Ошибка в выводе
+```
+
+**Решение:** SSH handler автоматически обнаруживает ошибки RouterOS в stdout:
+- `expected end of command`
+- `bad command name`
+- `no such item`
+- `failure:`
+- И другие
+
+**При добавлении новых команд:**
+1. Добавьте юнит-тест с моками
+2. Добавьте интеграционный тест (если возможно)
+3. Обновите тестовые данные для RouterOS v7.22+
+
+См. `tests/README.md` для подробного руководства.
 
 ### Пример теста
 

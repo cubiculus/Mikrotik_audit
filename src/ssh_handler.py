@@ -316,6 +316,28 @@ class SSHHandler:
                 exit_status = stdout.channel.recv_exit_status()
                 out = stdout.read().decode('utf-8', errors='ignore')
                 err = stderr.read().decode('utf-8', errors='ignore')
+
+                # RouterOS v7 may return exit_status=0 even for invalid commands
+                # Check stdout for error messages that indicate command failure
+                if exit_status == 0 and out:
+                    out_lower = out.lower()
+                    routeros_error_patterns = [
+                        "expected end of command",
+                        "bad command name",
+                        "no such item",
+                        "failure:",
+                        "can not do that",
+                        "not enough permissions",
+                        "syntax error",
+                    ]
+                    for pattern in routeros_error_patterns:
+                        if pattern in out_lower:
+                            logger.debug(
+                                f"RouterOS error detected in command '{command}': {pattern}"
+                            )
+                            # Return exit_status=1 to indicate failure
+                            return (1, out, f"RouterOS error: {pattern}")
+
                 return exit_status, out, err
             except paramiko.SSHException as e:
                 logger.error(f"SSH error executing command '{command}': {e}")
