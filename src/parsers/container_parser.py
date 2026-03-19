@@ -3,7 +3,6 @@
 import logging
 import re
 from typing import List, Tuple
-from functools import lru_cache
 
 from src.models import Container, NetworkOverview
 
@@ -12,9 +11,10 @@ logger = logging.getLogger(__name__)
 # Precompiled regular expressions
 # Match container header line: index followed by optional flags
 # Flags: X - stopped, D - disabled, R - running, S - seccomp, A - apparmor, I - iptables
+# RouterOS v7.22+ format: " 0 R ;;; comment" or " 0  R  name=..."
 CONTAINER_HEADER_PATTERN = re.compile(r"^\s*(\d+)\s+([XDRSAI]*)\s*(.*)")
 NEW_CONTAINER_PATTERN = re.compile(r"^\s*\d+")
-INDENTED_PATTERN = re.compile(r"^\s{3,}")
+INDENTED_PATTERN = re.compile(r"^\s{2,}")  # Changed from 3+ to 2+ for RouterOS v7.22+
 
 # Container field mapping
 CONTAINER_FIELD_MAP = {
@@ -29,14 +29,15 @@ CONTAINER_FIELD_MAP = {
 }
 
 
-@lru_cache(maxsize=128)
 def _parse_container_param_cached(param_str: str) -> tuple:
     """Cached container parameter parsing."""
     if '=' not in param_str:
         return None, None
     try:
         key, value = param_str.split('=', 1)
-        return key, value.strip("'")
+        # Remove quotes from value
+        clean_value = value.strip().strip("'\"")
+        return key, clean_value
     except ValueError:
         return None, None
 
@@ -71,21 +72,18 @@ def parse_containers(results: List) -> Tuple[List[Container], NetworkOverview]:
         if header_match:
             # Check if this line has container parameters (name=, remote-image=, etc.)
             rest_of_line = header_match.group(3).strip() if header_match.group(3) else ''
-
-            # Skip lines that don't have container data (just index with flags)
-            if not rest_of_line or '=' not in rest_of_line:
-                i += 1
-                continue
-
             flags = header_match.group(2) or ''
+
+            # RouterOS v7.22+: First line may only have comment, params on next lines
+            # Don't skip - process all container headers
             status = "running" if 'R' in flags else "stopped"
 
             current_container = Container()
             current_container.status = status
 
-            logger.debug(f"Found container with flags: {flags}, status: {status}")
+            logger.debug(f"Found container header at line {i}: flags={flags}, status={status}")
 
-            # Parse parameters from the same line (after flags)
+            # Parse parameters from the same line (after flags) if present
             if '=' in rest_of_line:
                 for part in rest_of_line.split():
                     key, value = _parse_container_param_cached(part)
@@ -98,14 +96,14 @@ def parse_containers(results: List) -> Tuple[List[Container], NetworkOverview]:
                 next_line = lines[j]
                 next_line_stripped = next_line.strip()
 
+                # RouterOS v7.22+ format: continuation lines start with 4+ spaces
                 # New container: line starts with single space + number
-                # Continuation lines start with multiple spaces (indentation)
-                if next_line.startswith(' ') and not next_line.startswith('   '):
-                    # Could be a new container (single space indent)
+                if next_line.startswith(' ') and not next_line.startswith('    '):
+                    # Could be a new container (1-3 spaces indent)
                     if NEW_CONTAINER_PATTERN.match(next_line_stripped):
                         break
                 elif not next_line.startswith(' '):
-                    # No indent at all - could be new container
+                    # No indent at all - could be new section
                     if NEW_CONTAINER_PATTERN.match(next_line_stripped):
                         break
 

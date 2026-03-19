@@ -292,7 +292,8 @@ class HTMLReportGenerator(BaseReportGenerator):
 
         if backup_result.status == "success":
             size_kb = f"{backup_result.file_size / BYTES_PER_KB:.2f} KB" if backup_result.file_size else "Unknown"
-            file_link = f"<a href='{backup_result.local_path}' style='color:#065f46;text-decoration:underline' target='_blank'>💾 Download Backup File</a>" if backup_result.local_path else ""
+            # Show backup filename (not full path - HTML reports are static files)
+            backup_info = f"💾 <code style='background:#f0f0f0;padding:2px 6px;border-radius:3px'>{backup_result.file_name}</code>" if backup_result.file_name else "File not available"
 
             html = "<div style='background:#d1fae5;padding:20px;border-radius:8px;border-left:4px solid #10b981'>"
             html += "<h3 style='margin:0;color:#065f46'>✅ Backup Successful</h3>"
@@ -300,8 +301,8 @@ class HTMLReportGenerator(BaseReportGenerator):
             html += f"<strong>Timestamp:</strong> {backup_result.timestamp}<br>"
             html += f"<strong>File:</strong> {backup_result.file_name or 'N/A'}<br>"
             html += f"<strong>Size:</strong> {size_kb}<br>"
-            if file_link:
-                html += f"<strong>Location:</strong> {file_link}"
+            html += f"<strong>Location:</strong> {backup_info}<br>"
+            html += "<em style='font-size:0.85em;color:#666'>💡 Backup file saved in the same directory as this report</em>"
             if backup_result.download_error:
                 html += f"<br><strong style='color:#f59e0b'>⚠️ Download Warning:</strong> {backup_result.download_error}"
             html += "</p></div>"

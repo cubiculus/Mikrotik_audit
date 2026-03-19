@@ -283,28 +283,46 @@ def parse_ping_results(results: List) -> dict:
 
     # Парсим результаты
     lines = output.split('\n')
+    stats_line = ""
+
     for line in lines:
         line = line.strip()
         if not line:
             continue
 
-        # Ищем статистику
+        # Ищем статистику - может быть на нескольких строках
         if 'sent=' in line and 'received=' in line:
-            data = _parse_key_value_line(line)
-            try:
-                ping_result['sent'] = int(data.get('sent', '0'))
-                ping_result['received'] = int(data.get('received', '0'))
-                ping_result['lost'] = int(data.get('lost', '0'))
+            stats_line += " " + line
+        elif stats_line and ('min-rtt=' in line or 'max-rtt=' in line or 'avg-rtt=' in line):
+            # Продолжение статистики на следующей строке
+            stats_line += " " + line
+        elif stats_line:
+            # Конец статистики - парсим
+            break
 
-                if ping_result['sent'] > 0:
-                    ping_result['loss_percent'] = (ping_result['lost'] / ping_result['sent']) * 100
+    # Парсим собранную статистику
+    if stats_line:
+        data = _parse_key_value_line(stats_line)
+        try:
+            ping_result['sent'] = int(data.get('sent', '0'))
+            ping_result['received'] = int(data.get('received', '0'))
+            ping_result['lost'] = int(data.get('lost', '0'))
 
-                ping_result['avg_rtt'] = data.get('avg_rtt', '') or data.get('avg-rtt', '')
-                ping_result['min_rtt'] = data.get('min_rtt', '') or data.get('min-rtt', '')
-                ping_result['max_rtt'] = data.get('max_rtt', '') or data.get('max-rtt', '')
-            except ValueError:
-                pass
-        else:
+            if ping_result['sent'] > 0:
+                ping_result['loss_percent'] = (ping_result['lost'] / ping_result['sent']) * 100
+
+            ping_result['avg_rtt'] = data.get('avg_rtt', '') or data.get('avg-rtt', '')
+            ping_result['min_rtt'] = data.get('min_rtt', '') or data.get('min-rtt', '')
+            ping_result['max_rtt'] = data.get('max_rtt', '') or data.get('max-rtt', '')
+        except ValueError:
+            pass
+    else:
+        # Парсим отдельные пинги
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
             # Парсим отдельные пинги
             # Формат: "0 8.8.8.8 56 116 2ms" или "0 8.8.8.8 56 116 2ms ttl-unreachable"
             parts = line.split()

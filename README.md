@@ -23,6 +23,21 @@ Professional automated audit tool for MikroTik RouterOS with security checks, co
 - [Основная документация](docs/README_RU.md)
 - [Руководство по настройке SSH](docs/SSH_SECURITY_RU.md)
 
+## ✅ Tested On
+
+**RouterOS Version:** 7.22 (stable)
+**Hardware:** hAP ax³ (C53UiG+5HPaxD2HPaxD)
+**Python:** 3.13
+**Last Tested:** March 2026
+
+### Features Verified:
+- ✅ System backup creation and download
+- ✅ Container detection and parsing (Docker)
+- ✅ Security analysis (firewall, services, SSH)
+- ✅ All report formats (HTML, JSON, TXT, Markdown)
+- ✅ SSH key authentication
+- ✅ Comprehensive audit level (148 commands)
+
 ## 🚀 Quick Start
 
 ### ⚡ One-Line Install
