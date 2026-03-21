@@ -72,12 +72,12 @@ def _create_bridge_port(data: dict) -> BridgePort:
     try:
         port.priority = int(data.get('priority', '0'))
     except ValueError:
-        pass
+        logger.debug(f"Invalid priority value: {data.get('priority')}")
 
     try:
         port.path_cost = int(data.get('path_cost', '') or data.get('path-cost', '0'))
     except ValueError:
-        pass
+        logger.debug(f"Invalid path_cost value: {data.get('path_cost') or data.get('path-cost')}")
 
     port.edge = data.get('edge', '')
     port.p2p = data.get('p2p', '')
@@ -157,7 +157,7 @@ def _create_wireguard_peer(data: dict) -> WireGuardPeer:
     try:
         peer.endpoint_port = int(data.get('endpoint_port', '') or data.get('endpoint-port', '0'))
     except ValueError:
-        pass
+        logger.debug(f"Invalid endpoint_port value: {data.get('endpoint_port') or data.get('endpoint-port')}")
 
     peer.allowed_address = data.get('allowed_address', '') or data.get('allowed-address', '')
 
@@ -166,7 +166,7 @@ def _create_wireguard_peer(data: dict) -> WireGuardPeer:
     try:
         peer.persistent_keepalive = int(re.sub(r'[^\d]', '', pk) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid persistent_keepalive value: {pk}")
 
     peer.last_handshake = data.get('last_handshake', '') or data.get('last-handshake', '')
 
@@ -176,11 +176,11 @@ def _create_wireguard_peer(data: dict) -> WireGuardPeer:
     try:
         peer.tx_bytes = int(re.sub(r'[^\d]', '', tx) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid tx_bytes value: {tx}")
     try:
         peer.rx_bytes = int(re.sub(r'[^\d]', '', rx) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid rx_bytes value: {rx}")
 
     peer.disabled = data.get('disabled', 'no') in ('yes', 'true')
 
@@ -260,25 +260,25 @@ def _create_ppp_active(data: dict) -> PPPActive:
         rate_tx = data.get('rate_tx', '') or data.get('rate-tx', '0')
         conn.rate_tx = int(re.sub(r'[^\d]', '', rate_tx) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid rate_tx value: {rate_tx}")
 
     try:
         rate_rx = data.get('rate_rx', '') or data.get('rate-rx', '0')
         conn.rate_rx = int(re.sub(r'[^\d]', '', rate_rx) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid rate_rx value: {rate_rx}")
 
     try:
         total_tx = data.get('total_tx', '') or data.get('total-tx', '0')
         conn.total_tx = int(re.sub(r'[^\d]', '', total_tx) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid total_tx value: {total_tx}")
 
     try:
         total_rx = data.get('total_rx', '') or data.get('total-rx', '0')
         conn.total_rx = int(re.sub(r'[^\d]', '', total_rx) or '0')
     except ValueError:
-        pass
+        logger.debug(f"Invalid total_rx value: {total_rx}")
 
     return conn
 

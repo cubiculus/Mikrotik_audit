@@ -141,6 +141,8 @@ ALLOWLIST_STRINGS: List[str] = [
     # Documentation strings in check_pii.py itself
     'name="..."',             # docstring example
     'host-name="[^"',         # regex pattern definition
+    # Pydantic model fields
+    'password: Optional',     # Pydantic model field definition
 ]
 
 # ═════════════════════════════════════════════════════════════════════════════

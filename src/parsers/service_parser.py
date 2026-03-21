@@ -139,7 +139,7 @@ def _create_service(data: dict) -> Service:
     try:
         service.port = int(data.get('port', 0))
     except ValueError:
-        pass
+        logger.debug(f"Invalid port value: {data.get('port')}")
 
     service.disabled = data.get('disabled', 'no') in ('yes', 'true')
     service.tls_required = data.get('tls_required', 'no') in ('yes', 'true')
@@ -185,7 +185,7 @@ def parse_ssh_sessions(results: List) -> List[SSHSession]:
                 try:
                     session.remote_port = int(parts[1])
                 except ValueError:
-                    pass
+                    logger.debug(f"Invalid remote_port value: {parts[1]}")
             else:
                 session.remote_address = remote
 
@@ -344,7 +344,7 @@ def _create_certificate(data: dict) -> Certificate:
     try:
         cert.key_size = int(data.get('key_size', '') or data.get('key-size', '0'))
     except ValueError:
-        pass
+        logger.debug(f"Invalid key_size value: {data.get('key_size') or data.get('key-size')}")
 
     # Check if expired (simple check based on valid-until)
     # Full check would require date parsing
@@ -498,7 +498,7 @@ def _create_scheduler(data: dict) -> Scheduler:
     try:
         scheduler.run_count = int(data.get('run_count', '') or data.get('run-count', '0'))
     except ValueError:
-        pass
+        logger.debug(f"Invalid run_count value: {data.get('run_count') or data.get('run-count')}")
 
     scheduler.last_run = data.get('last_run', '') or data.get('last-run', '')
     scheduler.next_run = data.get('next_run', '') or data.get('next-run', '')

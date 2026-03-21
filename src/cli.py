@@ -212,6 +212,21 @@ def main(
         elif quiet:
             logging.getLogger().setLevel(logging.WARNING)
 
+        # Validate router IP address
+        if router_ip and router_ip != os.getenv("MIKROTIK_IP", "192.168.100.1"):
+            try:
+                import ipaddress
+                ipaddress.ip_address(router_ip)
+            except ValueError:
+                logger.error(f"Invalid router IP address: {router_ip}")
+                sys.exit(1)
+
+        # Validate SSH port
+        if ssh_port is not None:
+            if not 1 <= ssh_port <= 65535:
+                logger.error(f"Invalid SSH port: {ssh_port}. Must be between 1 and 65535")
+                sys.exit(1)
+
         # Use environment variables for values not provided via CLI
         router_ip = router_ip or os.getenv("MIKROTIK_IP", "192.168.100.1")
         ssh_port = ssh_port or int(os.getenv("MIKROTIK_PORT", "22"))
@@ -614,15 +629,27 @@ def diff(report1: str, report2: str, output: Optional[str]):
 
 
 @cli.command(name='web-server')
-@click.option('--host', default='127.0.0.1', help='Host to bind to')
-@click.option('--port', default=5000, type=int, help='Port to listen on')
+@click.option('--host', default=None, help='Host to bind to (default: 127.0.0.1 or FLASK_HOST env var)')
+@click.option('--port', default=None, type=int, help='Port to listen on (default: 5000 or FLASK_PORT env var)')
 @click.option('--debug', is_flag=True, help='Enable debug mode')
 def web_server(host, port, debug):
     """Start web interface."""
     if not WEB_AVAILABLE:
         click.echo(f"{Fore.RED}Error: Web interface dependencies not installed.{Style.RESET_ALL}", err=True)
-        click.echo("Install with: pip install flask flask-cors", err=True)
+        click.echo("Install with: pip install -r requirements-web.txt", err=True)
         sys.exit(1)
+
+    # Load from environment variables if not provided via CLI
+    host = host or os.getenv("FLASK_HOST", "127.0.0.1")
+    port = port or int(os.getenv("FLASK_PORT", "5000"))
+
+    # Warn if binding to all interfaces in debug mode
+    if debug and host == "0.0.0.0":  # nosec B104
+        click.echo(click.style(
+            "WARNING: Binding to 0.0.0.0 in debug mode may expose the application publicly. "
+            "Consider using a specific host in production.",
+            fg='yellow'
+        ), err=True)
 
     run_web_server(host=host, port=port, debug=debug)
 

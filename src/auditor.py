@@ -191,11 +191,11 @@ class MikroTikAuditor:
                         try:
                             result = future.result()
                             self.results.append(result)
-                            status = "✓" if not result.has_error else "✗"
+                            status = "[OK]" if not result.has_error else "[FAIL]"
                             pbar.set_postfix_str(f"{status} {cmd[:40]}{'...' if len(cmd) > 40 else ''}")
                             pbar.update(1)
                         except Exception as e:
-                            pbar.set_postfix_str(f"✗ {cmd[:40]}{'...' if len(cmd) > 40 else ''} (Error: {str(e)[:20]})")
+                            pbar.set_postfix_str(f"[FAIL] {cmd[:40]}{'...' if len(cmd) > 40 else ''} (Error: {str(e)[:20]})")
                             pbar.update(1)
             else:
                 # Verbose logging mode
@@ -204,7 +204,7 @@ class MikroTikAuditor:
                     try:
                         result = future.result()
                         self.results.append(result)
-                        status = f"{Fore.GREEN}✓{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}✗{Style.RESET_ALL}"
+                        status = f"{Fore.GREEN}[OK]{Style.RESET_ALL}" if not result.has_error else f"{Fore.RED}[FAIL]{Style.RESET_ALL}"
                         logger.info(
                             f"[{Fore.CYAN}{index}{Style.RESET_ALL}/{Fore.CYAN}{total}{Style.RESET_ALL}] {status} {Fore.YELLOW}{cmd[:50]}{Style.RESET_ALL}"
                             f"{'...' if len(cmd) > 50 else ''} ({result.duration:.2f}s)"
@@ -236,7 +236,7 @@ class MikroTikAuditor:
             logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
             logger.info(f"{Fore.CYAN}🔧 MikroTik Router Audit{Style.RESET_ALL}")
             logger.info(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-            logger.info(f"{Fore.GREEN}✓ Connected to router:{Style.RESET_ALL} {self.router_info.identity}")
+            logger.info(f"{Fore.GREEN}[+] Connected to router:{Style.RESET_ALL} {self.router_info.identity}")
             logger.info(f"{Fore.CYAN}  Model:{Style.RESET_ALL} {self.router_info.model}")
             logger.info(f"{Fore.CYAN}  Version:{Style.RESET_ALL} v{self.router_info.version}")
             logger.info(f"{Fore.CYAN}  IP:{Style.RESET_ALL} {self.router_info.ip}")
@@ -276,14 +276,14 @@ class MikroTikAuditor:
                         result.stderr = redact_sensitive_data(result.stderr)
 
             # Parse all data
-            logger.info(f"\n{Fore.YELLOW}📊 Parsing collected data...{Style.RESET_ALL}")
+            logger.info(f"\n{Fore.YELLOW}[+] Parsing collected data...{Style.RESET_ALL}")
             self._data_parser = DataParser()
             self._network_overview = self._data_parser.build_network_overview(self.results)
-            logger.info(f"  {Fore.GREEN}✓ Parsed {self._network_overview.total_interfaces} interfaces{Style.RESET_ALL}")
-            logger.info(f"  {Fore.GREEN}✓ Parsed {self._network_overview.total_ip_addresses} IP addresses{Style.RESET_ALL}")
-            logger.info(f"  {Fore.GREEN}✓ Parsed {self._network_overview.dhcp_leases_count} DHCP leases{Style.RESET_ALL}")
-            logger.info(f"  {Fore.GREEN}✓ Parsed {len(self._network_overview.services)} services{Style.RESET_ALL}")
-            logger.info(f"  {Fore.GREEN}✓ Parsed {len(self._network_overview.certificates)} certificates{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}[+] Parsed {self._network_overview.total_interfaces} interfaces{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}[+] Parsed {self._network_overview.total_ip_addresses} IP addresses{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}[+] Parsed {self._network_overview.dhcp_leases_count} DHCP leases{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}[+] Parsed {len(self._network_overview.services)} services{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}[+] Parsed {len(self._network_overview.certificates)} certificates{Style.RESET_ALL}")
 
             # Analyze security
             self._analyze_security()
@@ -321,34 +321,34 @@ class MikroTikAuditor:
         # Phase 1: Fast commands
         if grouped['fast']:
             if self.config.show_progress_bar:
-                logger.info(f"\n{Fore.YELLOW}▶ Phase 1: Fast commands ({len(grouped['fast'])})...{Style.RESET_ALL}\n")
+                logger.info(f"\n{Fore.YELLOW}> Phase 1: Fast commands ({len(grouped['fast'])})...{Style.RESET_ALL}\n")
             self._execute_command_group(grouped['fast'], self._get_optimal_workers(), 1, total, "Phase 1: Fast")
 
         # Phase 2: Heavy commands
         if grouped['heavy']:
             if self.config.show_progress_bar:
-                logger.info(f"\n{Fore.YELLOW}▶ Phase 2: Heavy commands ({len(grouped['heavy'])})...{Style.RESET_ALL}\n")
+                logger.info(f"\n{Fore.YELLOW}> Phase 2: Heavy commands ({len(grouped['heavy'])})...{Style.RESET_ALL}\n")
             start_idx = len(grouped['fast']) + 1
             self._execute_command_group(grouped['heavy'], self._get_optimal_workers(), start_idx, total, "Phase 2: Heavy")
 
         # Phase 3: Normal commands
         if grouped['normal']:
             if self.config.show_progress_bar:
-                logger.info(f"\n{Fore.YELLOW}▶ Phase 3: Normal commands ({len(grouped['normal'])})...{Style.RESET_ALL}\n")
+                logger.info(f"\n{Fore.YELLOW}> Phase 3: Normal commands ({len(grouped['normal'])})...{Style.RESET_ALL}\n")
             start_idx = len(grouped['fast']) + len(grouped['heavy']) + 1
             self._execute_command_group(grouped['normal'], self._get_optimal_workers(), start_idx, total, "Phase 3: Normal")
 
         # Phase 4: Dependent commands (sequential)
         if grouped['dependent']:
             if self.config.show_progress_bar:
-                logger.info(f"\n{Fore.YELLOW}▶ Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
+                logger.info(f"\n{Fore.YELLOW}> Phase 4: Dependent commands ({len(grouped['dependent'])})...{Style.RESET_ALL}\n")
             start_idx = len(grouped['fast']) + len(grouped['heavy']) + len(grouped['normal']) + 1
             for cmd in grouped['dependent']:
                 result = self.execute_command(start_idx, cmd)
                 self.results.append(result)
                 if self.config.show_progress_bar:
-                    status = "✓" if not result.has_error else "✗"
-                    print(f"  {status} {cmd[:50]}{'...' if len(cmd) > 50 else ''}")
+                    status = "OK" if not result.has_error else "FAIL"
+                    logger.info(f"  {status} {cmd[:50]}{'...' if len(cmd) > 50 else ''}")
                 start_idx += 1
 
     def _analyze_security(self) -> List[SecurityIssue]:
@@ -357,7 +357,7 @@ class MikroTikAuditor:
             self._security_issues = []
             return []
 
-        logger.info(f"\n{Fore.YELLOW}🔒 Analyzing security posture...{Style.RESET_ALL}")
+        logger.info(f"\n{Fore.YELLOW}[+] Analyzing security posture...{Style.RESET_ALL}")
         self._security_issues = SecurityAnalyzer.analyze(self.results)
 
         # Advanced container analysis (1.8)
@@ -381,7 +381,7 @@ class MikroTikAuditor:
         if self._security_issues:
             logger.info(f"  {Fore.RED}⚠ Found {len(self._security_issues)} security issue(s){Style.RESET_ALL}")
         else:
-            logger.info(f"  {Fore.GREEN}✓ No security issues found{Style.RESET_ALL}")
+            logger.info(f"  {Fore.GREEN}[+] No security issues found{Style.RESET_ALL}")
 
         # Check CVE vulnerabilities if enabled
         if self.config.enable_cve_check and self.router_info:
@@ -395,7 +395,7 @@ class MikroTikAuditor:
             if cve_issues:
                 logger.info(f"  {Fore.RED}⚠ Found {len(cve_issues)} CVE vulnerability/vulnerabilities{Style.RESET_ALL}")
             else:
-                logger.info(f"  {Fore.GREEN}✓ No CVE vulnerabilities found{Style.RESET_ALL}")
+                logger.info(f"  {Fore.GREEN}[+] No CVE vulnerabilities found{Style.RESET_ALL}")
 
         return self._security_issues
 

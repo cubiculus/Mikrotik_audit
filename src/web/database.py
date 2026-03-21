@@ -103,8 +103,8 @@ def create_audit(router_ip: str, audit_level: str = 'Standard',
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO audits (router_ip, audit_level, audit_profile, started_at, status)
-            VALUES (?, ?, ?, ?, 'running')
-        ''', (router_ip, audit_level, audit_profile, datetime.now().isoformat()))
+            VALUES (?, ?, ?, ?, ?)
+        ''', (router_ip, audit_level, audit_profile, datetime.now().isoformat(), 'running'))
         conn.commit()
         return cursor.lastrowid
 

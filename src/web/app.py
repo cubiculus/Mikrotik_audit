@@ -5,12 +5,16 @@ import json
 import logging
 import threading
 import queue
+import ipaddress
 from pathlib import Path
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional, List, Any
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, Response, send_file
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from pydantic import BaseModel, ValidationError
 
 from src.web.database import (
     init_database,
@@ -24,7 +28,8 @@ from src.web.database import (
     delete_audit,
     get_audit_stats,
     get_score_history,
-    AUDITS_DIR
+    AUDITS_DIR,
+    DATA_DIR
 )
 from src.config import AuditConfig, RouterConfig, AuditLevel
 from src.auditor import MikroTikAuditor
@@ -33,14 +38,96 @@ from src.security_analyzer import SecurityAnalyzer
 
 logger = logging.getLogger(__name__)
 
+
+# ==================== Rate Limiting ====================
+
+# Initialize rate limiter to prevent abuse
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+    strategy="fixed-window"
+)
+
+
+# ==================== Validation Models ====================
+
+class AuditRequest(BaseModel):
+    """Validation model for audit requests."""
+    router_ip: str
+    ssh_port: int = 22
+    ssh_user: str
+    password: Optional[str] = None
+    ssh_key_file: Optional[str] = None
+    ssh_key_passphrase: Optional[str] = None
+    audit_level: str = 'Standard'
+    audit_profile: Optional[str] = None
+    redact: bool = False
+    cve_check: bool = True
+    connect_timeout: int = 30
+    command_timeout: int = 120
+
+    @classmethod
+    def validate_router_ip(cls, v: str) -> str:
+        """Validate router IP address."""
+        try:
+            ipaddress.ip_address(v)
+            return v
+        except ValueError:
+            raise ValueError(f"Invalid router IP address: {v}")
+
+    @classmethod
+    def validate_ssh_port(cls, v: int) -> int:
+        """Validate SSH port."""
+        if not 1 <= v <= 65535:
+            raise ValueError("SSH port must be between 1 and 65535")
+        return v
+
+    @classmethod
+    def validate_audit_level(cls, v: str) -> str:
+        """Validate audit level."""
+        valid_levels = ['Basic', 'Standard', 'Comprehensive']
+        if v not in valid_levels:
+            raise ValueError(f"Invalid audit level. Must be one of: {', '.join(valid_levels)}")
+        return v
+
+
+class CompareRequest(BaseModel):
+    """Validation model for compare requests."""
+    audit_id_1: int
+    audit_id_2: int
+
 # Create Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24).hex()
+
+# Use a persistent SECRET_KEY from environment or generate one
+# For production, ALWAYS set FLASK_SECRET_KEY environment variable
+secret_key = os.getenv('FLASK_SECRET_KEY')
+if secret_key:
+    app.config['SECRET_KEY'] = secret_key
+    logger.info("Using SECRET_KEY from environment variable")
+else:
+    # Generate a persistent secret key for development only
+    # In production, this should always be set via FLASK_SECRET_KEY
+    secret_key_file = Path(DATA_DIR) / 'secret_key.txt'
+    if secret_key_file.exists():
+        app.config['SECRET_KEY'] = secret_key_file.read_text().strip()
+        logger.info("Loaded persistent SECRET_KEY from file")
+    else:
+        # Generate and save for persistence
+        app.config['SECRET_KEY'] = os.urandom(24).hex()
+        secret_key_file.write_text(app.config['SECRET_KEY'])
+        logger.warning("Generated new SECRET_KEY and saved to file. "
+                     "For production, set FLASK_SECRET_KEY environment variable!")
 CORS(app)
 
+# Initialize rate limiter with Flask app
+limiter.init_app(app)
+logger.info("Rate limiting initialized: 200 requests/day, 50 requests/hour per IP")
+
 # Audit queue for processing multiple routers
-audit_queue = queue.Queue()
-audit_threads = []
+audit_queue: queue.Queue[Any] = queue.Queue()
+audit_threads: List[threading.Thread] = []
 MAX_AUDIT_THREADS = 3  # Concurrent audits
 
 
@@ -142,35 +229,57 @@ def api_audit_issues(audit_id):
 
 
 @app.route('/api/audit/run', methods=['POST'])
+@limiter.limit("10 per hour")  # Stricter limit for audit start
 def api_run_audit():
     """Start new audit."""
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    router_ip = data.get('router_ip')
-    if not router_ip:
-        return jsonify({'error': 'router_ip is required'}), 400
+        if not data:
+            logger.warning("Empty request body received")
+            return jsonify({'error': 'Request body is required'}), 400
 
-    # Create audit record
-    audit_id = create_audit(
-        router_ip=router_ip,
-        audit_level=data.get('audit_level', 'Standard'),
-        audit_profile=data.get('audit_profile')
-    )
+        # Validate request data
+        try:
+            audit_request = AuditRequest(**data)
+        except ValidationError as e:
+            logger.warning(f"Validation error: {e}")
+            return jsonify({'error': f'Validation failed: {str(e)}'}), 400
 
-    # Queue audit for processing
-    audit_queue.put({
-        'audit_id': audit_id,
-        'config_data': data
-    })
+        router_ip = audit_request.router_ip
+        if not router_ip:
+            return jsonify({'error': 'router_ip is required'}), 400
 
-    # Start worker thread if needed
-    start_audit_workers()
+        # Validate that at least password or SSH key is provided
+        if not audit_request.password and not audit_request.ssh_key_file:
+            return jsonify({
+                'error': 'Either password or ssh_key_file is required for authentication'
+            }), 400
 
-    return jsonify({
-        'audit_id': audit_id,
-        'status': 'queued',
-        'message': 'Audit started'
-    })
+        # Create audit record
+        audit_id = create_audit(
+            router_ip=router_ip,
+            audit_level=audit_request.audit_level,
+            audit_profile=audit_request.audit_profile
+        )
+
+        # Queue audit for processing
+        audit_queue.put({
+            'audit_id': audit_id,
+            'config_data': audit_request.model_dump()
+        })
+
+        # Start worker thread if needed
+        start_audit_workers()
+
+        return jsonify({
+            'audit_id': audit_id,
+            'status': 'queued',
+            'message': 'Audit started'
+        })
+    except Exception as e:
+        logger.error(f"Unexpected error in api_run_audit: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/audit/<int:audit_id>/status')
@@ -230,39 +339,62 @@ def api_export_audit(audit_id, format):
 
 
 @app.route('/api/compare', methods=['POST'])
+@limiter.limit("20 per hour")
 def api_compare():
     """Compare two audits."""
-    data = request.get_json()
-    id1 = data.get('audit_id_1')
-    id2 = data.get('audit_id_2')
+    try:
+        data = request.get_json()
 
-    if not id1 or not id2:
-        return jsonify({'error': 'Both audit IDs required'}), 400
+        if not data:
+            logger.warning("Empty request body received in compare")
+            return jsonify({'error': 'Request body is required'}), 400
 
-    audit1 = get_audit(id1)
-    audit2 = get_audit(id2)
-    issues1 = get_audit_issues(id1)
-    issues2 = get_audit_issues(id2)
+        # Validate request data
+        try:
+            compare_request = CompareRequest(**data)
+        except ValidationError as e:
+            logger.warning(f"Validation error in compare: {e}")
+            return jsonify({'error': f'Validation failed: {str(e)}'}), 400
 
-    # Calculate differences
-    score_diff = (audit2.get('security_score') or 0) - (audit1.get('security_score') or 0)
+        id1 = compare_request.audit_id_1
+        id2 = compare_request.audit_id_2
 
-    # Find new/removed issues
-    findings1 = {i['finding'] for i in issues1}
-    findings2 = {i['finding'] for i in issues2}
+        if id1 == id2:
+            return jsonify({'error': 'Cannot compare audit with itself'}), 400
 
-    new_issues = findings2 - findings1
-    resolved_issues = findings1 - findings2
+        audit1 = get_audit(id1)
+        audit2 = get_audit(id2)
 
-    return jsonify({
-        'audit1': audit1,
-        'audit2': audit2,
-        'score_difference': score_diff,
-        'new_issues_count': len(new_issues),
-        'resolved_issues_count': len(resolved_issues),
-        'new_issues': list(new_issues),
-        'resolved_issues': list(resolved_issues)
-    })
+        if not audit1:
+            return jsonify({'error': f'Audit {id1} not found'}), 404
+        if not audit2:
+            return jsonify({'error': f'Audit {id2} not found'}), 404
+
+        issues1 = get_audit_issues(id1)
+        issues2 = get_audit_issues(id2)
+
+        # Calculate differences
+        score_diff = (audit2.get('security_score') or 0) - (audit1.get('security_score') or 0)
+
+        # Find new/removed issues
+        findings1 = {i['finding'] for i in issues1}
+        findings2 = {i['finding'] for i in issues2}
+
+        new_issues = findings2 - findings1
+        resolved_issues = findings1 - findings2
+
+        return jsonify({
+            'audit1': audit1,
+            'audit2': audit2,
+            'score_difference': score_diff,
+            'new_issues_count': len(new_issues),
+            'resolved_issues_count': len(resolved_issues),
+            'new_issues': list(new_issues),
+            'resolved_issues': list(resolved_issues)
+        })
+    except Exception as e:
+        logger.error(f"Unexpected error in api_compare: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 @app.route('/api/score-history')

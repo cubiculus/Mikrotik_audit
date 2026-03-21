@@ -105,7 +105,7 @@ def parse_system_resource(results: List) -> SystemResource:
             try:
                 resource.cpu_count = int(value)
             except ValueError:
-                pass
+                logger.debug(f"Invalid cpu_count value: {value}")
         elif key == 'cpu_load' or key == 'cpu-load':
             # CPU load может быть в формате "5%,12%,8%,15%"
             resource.cpu_load = [int(x.strip().replace('%', '')) for x in value.split(',') if x.strip()]
@@ -127,17 +127,17 @@ def parse_system_resource(results: List) -> SystemResource:
             try:
                 resource.write_sectors_since_reboot = int(value)
             except ValueError:
-                pass
+                logger.debug(f"Invalid write_sectors_since_reboot value: {value}")
         elif key == 'bad_blocks' or key == 'bad-blocks':
             try:
                 resource.bad_blocks = int(value)
             except ValueError:
-                pass
+                logger.debug(f"Invalid bad_blocks value: {value}")
         elif key == 'bad_blocks_percent' or key == 'bad-blocks-percent':
             try:
                 resource.bad_blocks_percent = float(value.replace('%', ''))
             except ValueError:
-                pass
+                logger.debug(f"Invalid bad_blocks_percent value: {value}")
         elif key == 'factory_firmware' or key == 'factory-firmware':
             resource.factory_firmware = value
         elif key == 'current_firmware' or key == 'current-firmware':
