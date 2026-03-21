@@ -1,6 +1,6 @@
 # ============================================================
 # MikroTik Audit - .gitignore
-# Версия: 3.1
+# Версия: 4.0
 # Для проекта: https://github.com/cubiculus/Mikrotik_audit
 
 # ------------------------------------------------------------
@@ -55,6 +55,11 @@ audit_report_*.html
 audit_report_*.json
 audit_report_*.md
 *_audit_report.*
+# Web interface database
+data/
+*.db
+*.sqlite
+*.sqlite3
 # 💾 КЭШ И ВРЕМЕННЫЕ ФАЙЛЫ
 .cache/
 .coverage
