@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Аудит #{{ audit.id }} - MikroTik Audit Tool{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-router"></i> Аудит #{{ audit.id }}</h2>
+    <a href="/history" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Информация</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>IP адрес</th>
+                        <td>{{ audit.router_ip }}</td>
+                    </tr>
+                    <tr>
+                        <th>Идентификатор</th>
+                        <td>{{ audit.router_identity or 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Версия RouterOS</th>
+                        <td>{{ audit.router_version or 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Уровень аудита</th>
+                        <td>{{ audit.audit_level }}</td>
+                    </tr>
+                    <tr>
+                        <th>Профиль</th>
+                        <td>{{ audit.audit_profile or 'Не использовался' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Статус</th>
+                        <td>
+                            {% if audit.status == 'completed' %}
+                            <span class="text-success"><i class="bi bi-check-circle"></i> Завершён</span>
+                            {% elif audit.status == 'running' %}
+                            <span class="text-primary"><i class="bi bi-arrow-repeat spin"></i> Выполняется</span>
+                            {% elif audit.status == 'failed' %}
+                            <span class="text-danger"><i class="bi bi-x-circle"></i> Ошибка</span>
+                            {% else %}
+                            <span class="text-muted">{{ audit.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Начало</th>
+                        <td>{{ audit.started_at[:19] if audit.started_at else 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Окончание</th>
+                        <td>{{ audit.completed_at[:19] if audit.completed_at else 'N/A' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Результаты</h5>
+            </div>
+            <div class="card-body">
+                {% if audit.status == 'completed' %}
+                <div class="text-center mb-4">
+                    <div class="score-circle {% if audit.security_score >= 80 %}score-low{% elif audit.security_score >= 60 %}score-medium{% elif audit.security_score >= 40 %}score-high{% else %}score-critical{% endif %} mx-auto"
+                         style="width: 150px; height: 150px; font-size: 2.5rem;">
+                        {{ audit.security_score }}
+                    </div>
+                    <p class="mt-2">Security Score</p>
+                </div>
+
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h3 class="text-danger">{{ audit.issues_count or 0 }}</h3>
+                        <small class="text-muted">Проблем найдено</small>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-grid gap-2">
+                    <a href="/report/{{ audit.id }}" class="btn btn-primary">
+                        <i class="bi bi-file-earmark-text"></i> Просмотр отчёта
+                    </a>
+                    <a href="/api/audit/{{ audit.id }}/export/html" class="btn btn-outline-primary">
+                        <i class="bi bi-download"></i> Скачать HTML
+                    </a>
+                </div>
+                {% elif audit.status == 'failed' %}
+                <div class="alert alert-danger">
+                    <strong>Ошибка:</strong>
+                    <pre class="mb-0">{{ audit.error_message or 'Неизвестная ошибка' }}</pre>
+                </div>
+                {% else %}
+                <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <p>Аудит выполняется...</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if audit.status == 'running' %}
+<script>
+// Auto-refresh for running audits
+setTimeout(() => location.reload(), 5000);
+</script>
+{% endif %}
+{% endblock %}

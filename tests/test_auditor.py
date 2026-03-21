@@ -8,6 +8,7 @@ from src.commands import (
     AUDIT_COMMANDS_BASIC,
     AUDIT_COMMANDS_STANDARD,
     AUDIT_COMMANDS_COMPREHENSIVE,
+    AUDIT_PROFILES,
 )
 
 
@@ -479,3 +480,84 @@ class TestExecutePhase:
 
         # No groups should be executed
         assert mock_execute_group.call_count == 0
+
+
+class TestAuditProfiles:
+    """Tests for audit profiles feature (1.6)."""
+
+    def test_default_no_profile(self):
+        """Test that default config has no profile."""
+        config = AuditConfig()
+        assert config.audit_profile is None
+
+    def test_wifi_profile_commands(self):
+        """Test WiFi profile returns correct commands."""
+        config = AuditConfig(audit_profile="wifi")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["wifi"]
+        assert len(commands) > 0
+
+    def test_protocols_profile_commands(self):
+        """Test Protocols profile returns correct commands."""
+        config = AuditConfig(audit_profile="protocols")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["protocols"]
+        assert len(commands) > 0
+
+    def test_system_profile_commands(self):
+        """Test System profile returns correct commands."""
+        config = AuditConfig(audit_profile="system")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["system"]
+        assert len(commands) > 0
+
+    def test_security_profile_commands(self):
+        """Test Security profile returns correct commands."""
+        config = AuditConfig(audit_profile="security")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["security"]
+        assert len(commands) > 0
+
+    def test_network_profile_commands(self):
+        """Test Network profile returns correct commands."""
+        config = AuditConfig(audit_profile="network")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["network"]
+        assert len(commands) > 0
+
+    def test_containers_profile_commands(self):
+        """Test Containers profile returns correct commands."""
+        config = AuditConfig(audit_profile="containers")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["containers"]
+        assert len(commands) > 0
+
+    def test_profile_overrides_audit_level(self):
+        """Test that profile overrides audit level."""
+        config = AuditConfig(audit_profile="wifi", audit_level=AuditLevel.COMPREHENSIVE)
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        # Should use WiFi profile, not Comprehensive level
+        assert commands == AUDIT_PROFILES["wifi"]
+        assert commands != AUDIT_COMMANDS_STANDARD
+
+    def test_invalid_profile_falls_back_to_level(self):
+        """Test that invalid profile falls back to audit level."""
+        config = AuditConfig(audit_profile="invalid_profile", audit_level=AuditLevel.STANDARD)
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        # Should fall back to Standard level
+        assert commands == AUDIT_COMMANDS_STANDARD
+
+    def test_profile_case_insensitive(self):
+        """Test that profile matching is case insensitive."""
+        config = AuditConfig(audit_profile="WIFI")
+        auditor = MikroTikAuditor(config)
+        commands = auditor.get_audit_commands()
+        assert commands == AUDIT_PROFILES["wifi"]

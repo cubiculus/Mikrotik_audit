@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Сравнение аудитов - MikroTik Audit Tool{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-arrow-left-right"></i> Сравнение аудитов</h2>
+
+{% if request.endpoint == 'compare_select' %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Выберите два аудита для сравнения</h5>
+    </div>
+    <div class="card-body">
+        <form action="/compare" method="get">
+            <div class="row mb-3">
+                <div class="col-md-5">
+                    <label class="form-label">Аудит 1 (было)</label>
+                    <select name="id1" class="form-select" required>
+                        <option value="">-- Выберите --</option>
+                        {% for audit in audits %}
+                        <option value="{{ audit.id }}">#{{ audit.id }} - {{ audit.router_ip }} ({{ audit.started_at[:10] if audit.started_at else 'N/A' }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-center justify-content-center">
+                    <span class="display-6 text-muted">↔</span>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Аудит 2 (стало)</label>
+                    <select name="id2" class="form-select" required>
+                        <option value="">-- Выберите --</option>
+                        {% for audit in audits %}
+                        <option value="{{ audit.id }}">#{{ audit.id }} - {{ audit.router_ip }} ({{ audit.started_at[:10] if audit.started_at else 'N/A' }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-arrow-left-right"></i> Сравнить
+            </button>
+        </form>
+    </div>
+</div>
+{% else %}
+<!-- Comparison Results -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">Аудит 1 (было)</div>
+            <div class="card-body">
+                <h4>{{ audit1.router_identity or audit1.router_ip }}</h4>
+                <p>{{ audit1.started_at[:19] if audit1.started_at else 'N/A' }}</p>
+                <div class="score-circle {% if audit1.security_score >= 80 %}score-low{% elif audit1.security_score >= 60 %}score-medium{% elif audit1.security_score >= 40 %}score-high{% else %}score-critical{% endif %}">
+                    {{ audit1.security_score or 'N/A' }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">Аудит 2 (стало)</div>
+            <div class="card-body">
+                <h4>{{ audit2.router_identity or audit2.router_ip }}</h4>
+                <p>{{ audit2.started_at[:19] if audit2.started_at else 'N/A' }}</p>
+                <div class="score-circle {% if audit2.security_score >= 80 %}score-low{% elif audit2.security_score >= 60 %}score-medium{% elif audit2.security_score >= 40 %}score-high{% else %}score-critical{% endif %}">
+                    {{ audit2.security_score or 'N/A' }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <i class="bi bi-plus-circle"></i> Новые проблемы
+            </div>
+            <div class="card-body">
+                {% if issues2 %}
+                <ul class="list-group list-group-flush">
+                    {% for issue in issues2 %}
+                    {% if issue not in issues1 %}
+                    <li class="list-group-item">
+                        <span class="badge bg-{{ 'danger' if issue.severity == 'Critical' else 'warning' if issue.severity == 'High' else 'info' if issue.severity == 'Medium' else 'success' }}">
+                            {{ issue.severity }}
+                        </span>
+                        {{ issue.finding }}
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">Нет новых проблем</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-check-circle"></i> Исправленные проблемы
+            </div>
+            <div class="card-body">
+                {% if issues1 %}
+                <ul class="list-group list-group-flush">
+                    {% for issue in issues1 %}
+                    {% if issue not in issues2 %}
+                    <li class="list-group-item">
+                        <span class="badge bg-{{ 'danger' if issue.severity == 'Critical' else 'warning' if issue.severity == 'High' else 'info' if issue.severity == 'Medium' else 'success' }}">
+                            {{ issue.severity }}
+                        </span>
+                        {{ issue.finding }}
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">Нет исправленных проблем</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

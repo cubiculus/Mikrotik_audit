@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MikroTik Audit Tool{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --score-critical: #dc3545;
+            --score-high: #fd7e14;
+            --score-medium: #ffc107;
+            --score-low: #198754;
+        }
+        body { background-color: #f8f9fa; }
+        .score-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: white;
+        }
+        .score-critical { background-color: var(--score-critical); }
+        .score-high { background-color: var(--score-high); }
+        .score-medium { background-color: var(--score-medium); color: #000; }
+        .score-low { background-color: var(--score-low); }
+        .status-running { color: #0d6efd; }
+        .status-completed { color: #198754; }
+        .status-failed { color: #dc3545; }
+        .status-pending { color: #6c757d; }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(180deg, #0d6efd 0%, #0a58ca 100%);
+        }
+        .sidebar a { color: rgba(255,255,255,0.8); text-decoration: none; }
+        .sidebar a:hover, .sidebar a.active { color: white; }
+        .issue-critical { border-left: 4px solid var(--score-critical); }
+        .issue-high { border-left: 4px solid var(--score-high); }
+        .issue-medium { border-left: 4px solid var(--score-medium); }
+        .issue-low { border-left: 4px solid var(--score-low); }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-2 d-md-block sidebar p-3">
+                <h4 class="text-white mb-4">
+                    <i class="bi bi-shield-check"></i> Audit Tool
+                </h4>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'index' else '' }}" href="/">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'new_audit' else '' }}" href="/audit/new">
+                            <i class="bi bi-plus-circle"></i> Новый аудит
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'history' else '' }}" href="/history">
+                            <i class="bi bi-clock-history"></i> История
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'compare_select' else '' }}" href="/compare">
+                            <i class="bi bi-arrow-left-right"></i> Сравнить
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-10 ms-sm-auto px-md-4 py-4">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

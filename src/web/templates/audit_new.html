@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Новый аудит - MikroTik Audit Tool{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-plus-circle"></i> Запуск аудита</h2>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Параметры подключения</h5>
+            </div>
+            <div class="card-body">
+                <form id="auditForm">
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="router_ip" class="form-label">IP адрес роутера *</label>
+                            <input type="text" class="form-control" id="router_ip"
+                                   placeholder="192.168.88.1" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="ssh_port" class="form-label">SSH порт</label>
+                            <input type="number" class="form-control" id="ssh_port" value="22">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="ssh_user" class="form-label">Пользователь</label>
+                            <input type="text" class="form-control" id="ssh_user" value="admin">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="password" class="form-label">Пароль</label>
+                            <input type="password" class="form-control" id="password">
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-3">Настройки аудита</h5>
+
+                    <div class="mb-3">
+                        <label for="audit_level" class="form-label">Уровень аудита</label>
+                        <select class="form-select" id="audit_level">
+                            <option value="Basic">Basic - Быстрый</option>
+                            <option value="Standard" selected>Standard - Рекомендуемый</option>
+                            <option value="Comprehensive">Comprehensive - Полный</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="audit_profile" class="form-label">Профиль (опционально)</label>
+                        <select class="form-select" id="audit_profile">
+                            <option value="">-- Использовать уровень аудита --</option>
+                            <option value="wifi">Wi-Fi проверки</option>
+                            <option value="protocols">Протоколы и сервисы</option>
+                            <option value="system">Системные проверки</option>
+                            <option value="security">Безопасность</option>
+                            <option value="network">Сеть</option>
+                            <option value="containers">Контейнеры</option>
+                        </select>
+                        <div class="form-text">Профиль переопределяет уровень аудита</div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-3">Опции</h5>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="cve_check" checked>
+                        <label class="form-check-label" for="cve_check">
+                            Проверка CVE уязвимостей
+                        </label>
+                    </div>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="live_cve" checked>
+                        <label class="form-check-label" for="live_cve">
+                            Live CVE lookup (NIST NVD API)
+                        </label>
+                    </div>
+
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="redact">
+                        <label class="form-check-label" for="redact">
+                            Скрыть чувствительные данные в отчёте
+                        </label>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-play-fill"></i> Запустить аудит
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Информация</h5>
+            </div>
+            <div class="card-body">
+                <h6>Уровни аудита:</h6>
+                <dl class="small">
+                    <dt>Basic</dt>
+                    <dd class="text-muted">Базовая информация о системе, ~10 команд</dd>
+
+                    <dt>Standard</dt>
+                    <dd class="text-muted">Полная проверка безопасности, ~100 команд</dd>
+
+                    <dt>Comprehensive</dt>
+                    <dd class="text-muted">Максимальная детализация, ~200 команд</dd>
+                </dl>
+
+                <h6 class="mt-4">Профили:</h6>
+                <dl class="small">
+                    <dt>Wi-Fi</dt>
+                    <dd class="text-muted">Проверка беспроводной безопасности</dd>
+
+                    <dt>Протоколы</dt>
+                    <dd class="text-muted">SNMP, UPnP, Proxy, RoMON</dd>
+
+                    <dt>Безопасность</dt>
+                    <dd class="text-muted">Firewall, NAT, пользователи</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Выполнение аудита</h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status"></div>
+                <p id="progressStatus">Подключение к роутеру...</p>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('auditForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const data = {
+        router_ip: document.getElementById('router_ip').value,
+        ssh_port: parseInt(document.getElementById('ssh_port').value),
+        ssh_user: document.getElementById('ssh_user').value,
+        password: document.getElementById('password').value,
+        audit_level: document.getElementById('audit_level').value,
+        audit_profile: document.getElementById('audit_profile').value,
+        cve_check: document.getElementById('cve_check').checked,
+        redact: document.getElementById('redact').checked
+    };
+
+    // Start audit
+    const response = await fetch('/api/audit/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (result.audit_id) {
+        // Show progress modal
+        const modal = new bootstrap.Modal(document.getElementById('progressModal'));
+        modal.show();
+
+        // Poll for status
+        checkStatus(result.audit_id, modal);
+    } else {
+        alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+    }
+});
+
+async function checkStatus(auditId, modal) {
+    const statusEl = document.getElementById('progressStatus');
+
+    const check = async () => {
+        const response = await fetch(`/api/audit/${auditId}/status`);
+        const data = await response.json();
+
+        if (data.status === 'completed') {
+            statusEl.textContent = 'Аудит завершён!';
+            setTimeout(() => {
+                modal.hide();
+                window.location.href = `/report/${auditId}`;
+            }, 1000);
+        } else if (data.status === 'failed') {
+            statusEl.textContent = 'Ошибка: ' + data.error_message;
+            statusEl.className = 'text-danger';
+        } else {
+            statusEl.textContent = 'Статус: ' + data.status;
+            setTimeout(check, 2000);
+        }
+    };
+
+    check();
+}
+</script>
+{% endblock %}

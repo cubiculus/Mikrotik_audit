@@ -157,6 +157,12 @@ class Container:
     created: str = ""
     started: str = ""
     uptime: str = ""
+    # Additional fields for deep analysis (1.8)
+    privileged: bool = False
+    mounts: list = field(default_factory=list)  # List of mount points
+    envs: list = field(default_factory=list)  # List of environment variables
+    netmask: str = ""  # Container network mask
+    bridge: str = ""  # Bridge interface name
 
 
 @dataclass

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Отчёт - MikroTik Audit Tool{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-file-earmark-text"></i> Отчёт об аудите #{{ audit.id }}</h2>
+    <div>
+        <a href="/history" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+        <button class="btn btn-primary" onclick="window.print()">
+            <i class="bi bi-printer"></i> Печать
+        </button>
+    </div>
+</div>
+
+<!-- Score Header -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-2 text-center">
+                <div class="score-circle {% if audit.security_score >= 80 %}score-low{% elif audit.security_score >= 60 %}score-medium{% elif audit.security_score >= 40 %}score-high{% else %}score-critical{% endif %} mx-auto">
+                    {{ audit.security_score }}
+                </div>
+            </div>
+            <div class="col-md-10">
+                <h4>{{ audit.router_identity or audit.router_ip }}</h4>
+                <p class="mb-1"><i class="bi bi-pc-display"></i> {{ audit.router_ip }} ({{ audit.router_version or 'N/A' }})</p>
+                <p class="mb-1"><i class="bi bi-clock"></i> {{ audit.started_at[:19] if audit.started_at else 'N/A' }}</p>
+                <p class="mb-0">
+                    <i class="bi bi-shield-check"></i> Уровень: {{ audit.audit_level }}
+                    {% if audit.audit_profile %} ({{ audit.audit_profile }}){% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Issues by Severity -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h3 class="text-danger">{{ issues|selectattr('severity', 'equalto', 'Critical')|list|length }}</h3>
+                <small class="text-muted">Critical</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h3 class="text-warning">{{ issues|selectattr('severity', 'equalto', 'High')|list|length }}</h3>
+                <small class="text-muted">High</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h3 class="text-info">{{ issues|selectattr('severity', 'equalto', 'Medium')|list|length }}</h3>
+                <small class="text-muted">Medium</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h3 class="text-success">{{ issues|selectattr('severity', 'equalto', 'Low')|list|length }}</h3>
+                <small class="text-muted">Low</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Issues List -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Найденные проблемы ({{ issues|length }})</h5>
+    </div>
+    <div class="card-body">
+        {% if issues %}
+        <div class="accordion" id="issuesAccordion">
+            {% for issue in issues %}
+            <div class="accordion-item issue-{{ issue.severity|lower }}">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#issue{{ loop.index }}">
+                        <span class="badge bg-{{ 'danger' if issue.severity == 'Critical' else 'warning' if issue.severity == 'High' else 'info' if issue.severity == 'Medium' else 'success' }} me-2">
+                            {{ issue.severity }}
+                        </span>
+                        {{ issue.finding }}
+                    </button>
+                </h2>
+                <div id="issue{{ loop.index }}" class="accordion-collapse collapse"
+                     data-bs-parent="#issuesAccordion">
+                    <div class="accordion-body">
+                        <p><strong>Категория:</strong> {{ issue.category }}</p>
+                        <p><strong>Описание:</strong> {{ issue.description }}</p>
+                        <p><strong>Рекомендация:</strong> {{ issue.recommendation }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-check-circle display-1 text-success"></i>
+            <h4 class="mt-3">Проблем не найдено!</h4>
+            <p class="text-muted">Конфигурация роутера соответствует лучшим практикам безопасности.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

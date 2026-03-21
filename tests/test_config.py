@@ -132,3 +132,20 @@ class TestAuditConfig:
         assert AuditLevel.BASIC.value == "Basic"
         assert AuditLevel.STANDARD.value == "Standard"
         assert AuditLevel.COMPREHENSIVE.value == "Comprehensive"
+
+    def test_audit_profile(self):
+        """Test audit_profile field."""
+        config = AuditConfig(audit_profile="wifi")
+        assert config.audit_profile == "wifi"
+
+    def test_audit_profile_none(self):
+        """Test audit_profile default is None."""
+        config = AuditConfig()
+        assert config.audit_profile is None
+
+    def test_audit_profile_all_profiles(self):
+        """Test all valid audit profiles."""
+        valid_profiles = ["wifi", "protocols", "system", "security", "network", "containers"]
+        for profile in valid_profiles:
+            config = AuditConfig(audit_profile=profile)
+            assert config.audit_profile == profile

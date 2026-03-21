@@ -17,6 +17,7 @@ from src.commands import (
     AUDIT_COMMANDS_BASIC,
     AUDIT_COMMANDS_STANDARD,
     AUDIT_COMMANDS_COMPREHENSIVE,
+    AUDIT_PROFILES,
 )
 from src.ssh_handler import SSHHandler
 from src.security_analyzer import SecurityAnalyzer
@@ -40,7 +41,17 @@ class MikroTikAuditor:
         self._data_parser: Optional[DataParser] = None
 
     def get_audit_commands(self) -> List[str]:
-        """Get commands based on audit level."""
+        """Get commands based on audit level and profile."""
+        # If profile is specified, use it instead of audit level
+        if self.config.audit_profile:
+            profile = self.config.audit_profile.lower()
+            if profile in AUDIT_PROFILES:
+                logger.info(f"Using audit profile: {profile}")
+                return AUDIT_PROFILES[profile]
+            else:
+                logger.warning(f"Unknown audit profile: {profile}. Using default audit level.")
+
+        # Fall back to audit level
         if self.config.audit_level == AuditLevel.BASIC:
             return AUDIT_COMMANDS_BASIC
         elif self.config.audit_level == AuditLevel.COMPREHENSIVE:
@@ -349,6 +360,24 @@ class MikroTikAuditor:
         logger.info(f"\n{Fore.YELLOW}🔒 Analyzing security posture...{Style.RESET_ALL}")
         self._security_issues = SecurityAnalyzer.analyze(self.results)
 
+        # Advanced container analysis (1.8)
+        container_issues = SecurityAnalyzer.analyze_containers(self.results)
+        self._security_issues.extend(container_issues)
+        if container_issues:
+            logger.info(f"  {Fore.RED}⚠ Found {len(container_issues)} container-related issue(s){Style.RESET_ALL}")
+
+        # Conflict analysis (2.1)
+        conflict_issues = SecurityAnalyzer.analyze_conflicts(self.results)
+        self._security_issues.extend(conflict_issues)
+        if conflict_issues:
+            logger.info(f"  {Fore.RED}⚠ Found {len(conflict_issues)} configuration conflict(s){Style.RESET_ALL}")
+
+        # IoC analysis (3.2)
+        ioc_issues = SecurityAnalyzer.analyze_ioc(self.results)
+        self._security_issues.extend(ioc_issues)
+        if ioc_issues:
+            logger.critical(f"  {Fore.RED}🚨 Found {len(ioc_issues)} indicator(s) of compromise!{Style.RESET_ALL}")
+
         if self._security_issues:
             logger.info(f"  {Fore.RED}⚠ Found {len(self._security_issues)} security issue(s){Style.RESET_ALL}")
         else:
@@ -357,7 +386,10 @@ class MikroTikAuditor:
         # Check CVE vulnerabilities if enabled
         if self.config.enable_cve_check and self.router_info:
             logger.info(f"\n{Fore.YELLOW}🔍 Checking CVE database...{Style.RESET_ALL}")
-            cve_issues = SecurityAnalyzer.check_cve(self.router_info.version)
+            cve_issues = SecurityAnalyzer.check_cve(
+                self.router_info.version,
+                use_live_lookup=self.config.enable_live_cve_lookup
+            )
             self._security_issues.extend(cve_issues)
 
             if cve_issues:

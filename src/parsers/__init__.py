@@ -2,7 +2,7 @@
 from .interface_parser import parse_interface_stats
 from .ip_parser import parse_ip_address_results
 from .dhcp_parser import parse_dhcp_leases
-from .container_parser import parse_containers
+from .container_parser import parse_containers, parse_container_mounts, parse_container_envs
 from .firewall_parser import parse_nat_rules, parse_filter_rules, parse_mangle_rules
 from .routing_parser import parse_routes, parse_routing_rules, parse_dns_config
 from .system_parser import (
@@ -38,6 +38,8 @@ __all__ = [
     'parse_ip_address_results',
     'parse_dhcp_leases',
     'parse_containers',
+    'parse_container_mounts',
+    'parse_container_envs',
     'parse_nat_rules',
     'parse_filter_rules',
     'parse_mangle_rules',

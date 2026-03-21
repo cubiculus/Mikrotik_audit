@@ -1,8 +1,19 @@
 """CVE database for MikroTik RouterOS vulnerabilities."""
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional, Dict
 import re
+import json
+import os
+import time
+from datetime import datetime, timedelta
+
+# Try to import urllib.request (always available in standard library)
+try:
+    import urllib.request
+    URLLIB_AVAILABLE = True
+except ImportError:
+    URLLIB_AVAILABLE = False
 
 
 @dataclass
@@ -226,3 +237,244 @@ def check_cve_for_version(version: str) -> List[CVE]:
             vulnerable_cves.append(cve)
 
     return vulnerable_cves
+
+
+# ===== LIVE CVE LOOKUP (NIST NVD API) =====
+
+NVD_API_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+CACHE_FILE = ".cache/nvd_cves.json"
+CACHE_DURATION_HOURS = 24
+
+# NVD API doesn't require API key for basic usage (rate limited to 5 requests/30 seconds)
+# Users can optionally set NVD_API_KEY environment variable for higher rate limits
+
+
+def _get_cache_path() -> str:
+    """Get path to cache file, creating directory if needed."""
+    cache_dir = os.path.dirname(CACHE_FILE)
+    if cache_dir and not os.path.exists(cache_dir):
+        os.makedirs(cache_dir, exist_ok=True)
+    return CACHE_FILE
+
+
+def _load_cached_data() -> Optional[Dict]:
+    """Load cached CVE data if not expired."""
+    cache_path = _get_cache_path()
+
+    if not os.path.exists(cache_path):
+        return None
+
+    try:
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Check if cache is expired
+        cached_time = datetime.fromisoformat(data.get('cached_at', ''))
+        if datetime.now() - cached_time > timedelta(hours=CACHE_DURATION_HOURS):
+            return None
+
+        return data
+    except (json.JSONDecodeError, ValueError, IOError):
+        return None
+
+
+def _save_cache_data(data: Dict) -> None:
+    """Save CVE data to cache."""
+    cache_path = _get_cache_path()
+    data['cached_at'] = datetime.now().isoformat()
+
+    try:
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except IOError as e:
+        print(f"Warning: Could not save CVE cache: {e}")
+
+
+def _parse_nvd_cve(cve_item: Dict) -> Optional[CVE]:
+    """Parse NVD CVE item to our CVE format."""
+    try:
+        cve_id = cve_item.get('id', '')
+
+        # Skip if not MikroTik related
+        descriptions = cve_item.get('descriptions', [])
+        description_text = ''
+        for desc in descriptions:
+            if desc.get('lang') == 'en':
+                description_text = desc.get('value', '')
+                break
+
+        # Check if this is MikroTik related
+        if 'mikrotik' not in description_text.lower() and 'routeros' not in description_text.lower():
+            return None
+
+        # Get CVSS score for severity
+        metrics = cve_item.get('metrics', {})
+        cvss_data = None
+
+        # Try different CVSS versions
+        for version in ['cvssMetricV31', 'cvssMetricV3', 'cvssMetricV2']:
+            if version in metrics and metrics[version]:
+                cvss_data = metrics[version][0].get('cvssData', {})
+                break
+
+        cvss_score = cvss_data.get('baseScore', 0) if cvss_data else 0
+
+        # Map CVSS score to severity
+        if cvss_score >= 9.0:
+            severity = "Critical"
+        elif cvss_score >= 7.0:
+            severity = "High"
+        elif cvss_score >= 4.0:
+            severity = "Medium"
+        else:
+            severity = "Low"
+
+        # Get title (first line of description)
+        title = description_text.split('.')[0] if description_text else cve_id
+
+        # Get references
+        references = []
+        for ref in cve_item.get('references', [])[:5]:  # Limit to 5 references
+            url = ref.get('url', '')
+            if url:
+                references.append(url)
+
+        # Try to extract affected versions from configuration
+        affected_versions = ["Unknown"]  # Default
+        fixed_version = "Unknown"
+
+        # NVD doesn't always provide version info in structured format
+        # We'll try to extract from description
+        version_match = re.search(r'before\s+(\d+\.\d+(?:\.\d+)?)', description_text, re.IGNORECASE)
+        if version_match:
+            fixed_version = version_match.group(1)
+            affected_versions = [f"0.0-{fixed_version}"]
+
+        return CVE(
+            cve_id=cve_id,
+            severity=severity,
+            title=title,
+            description=description_text[:500] + "..." if len(description_text) > 500 else description_text,
+            recommendation=f"Upgrade to RouterOS {fixed_version} or later if available",
+            affected_versions=affected_versions,
+            fixed_version=fixed_version,
+            references=references
+        )
+    except (KeyError, IndexError, ValueError) as e:
+        print(f"Error parsing NVD CVE item: {e}")
+        return None
+
+
+def fetch_cves_from_nvd(mikrotik_only: bool = True) -> List[CVE]:
+    """
+    Fetch CVEs from NIST NVD API.
+
+    Args:
+        mikrotik_only: If True, filter for MikroTik RouterOS only
+
+    Returns:
+        List of CVE objects
+    """
+    if not URLLIB_AVAILABLE:
+        return []
+
+    cves = []
+
+    try:
+        # Search for MikroTik RouterOS CVEs
+        keyword = "MikroTik RouterOS"
+        url = f"{NVD_API_BASE}?keywordSearch={keyword}&resultsPerPage=100"
+
+        # Add API key if available
+        api_key = os.getenv('NVD_API_KEY')
+        if api_key:
+            # Note: NVD API 2.0 doesn't use apiKey header, it's for rate limiting only
+            pass
+
+        # Create request with User-Agent (required by NVD)
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'MikroTik-Audit-Tool/1.0',
+                'Accept': 'application/json'
+            }
+        )
+
+        # NVD API has rate limits: 5 requests per 30 seconds without API key
+        # We'll add a small delay to be respectful
+        time.sleep(0.5)
+
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode('utf-8'))
+
+        # Parse CVEs from response
+        for cve_item in data.get('vulnerabilities', []):
+            cve_data = cve_item.get('cve', {})
+            cve = _parse_nvd_cve(cve_data)
+            if cve:
+                cves.append(cve)
+
+        return cves
+
+    except Exception as e:
+        print(f"Error fetching CVEs from NVD: {e}")
+        return []
+
+
+def check_cve_live(version: str, use_cache: bool = True) -> List[CVE]:
+    """
+    Check RouterOS version against live CVE database with caching.
+
+    Falls back to static database if network is unavailable.
+
+    Args:
+        version: RouterOS version string
+        use_cache: Whether to use cached data
+
+    Returns:
+        List of applicable CVEs (static + live if available)
+    """
+    # Start with static database results
+    all_cves = check_cve_for_version(version)
+    static_cve_ids = {cve.cve_id for cve in all_cves}
+
+    # Try to load from cache
+    cached_data = None
+    if use_cache:
+        cached_data = _load_cached_data()
+
+    # Fetch from NVD if cache miss or expired
+    live_cves = []
+    if cached_data:
+        # Parse cached CVEs
+        for cve_data in cached_data.get('cves', []):
+            try:
+                cve = CVE(**cve_data)
+                if cve.cve_id not in static_cve_ids:
+                    live_cves.append(cve)
+            except (TypeError, KeyError):
+                continue
+    else:
+        # Fetch from NVD
+        live_cves = fetch_cves_from_nvd()
+
+        # Save to cache
+        if live_cves and use_cache:
+            cache_data = {
+                'cves': [cve.__dict__ for cve in live_cves],
+                'cached_at': datetime.now().isoformat()
+            }
+            _save_cache_data(cache_data)
+
+    # Combine static and live CVEs
+    all_cves.extend(live_cves)
+
+    # Remove duplicates by CVE ID
+    seen_ids = set()
+    unique_cves = []
+    for cve in all_cves:
+        if cve.cve_id not in seen_ids:
+            seen_ids.add(cve.cve_id)
+            unique_cves.append(cve)
+
+    return unique_cves

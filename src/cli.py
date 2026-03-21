@@ -19,6 +19,13 @@ from src.backup_manager import BackupManager
 from src.report_generator import ReportGenerator
 from src.security_analyzer import SecurityAnalyzer
 
+# Optional web interface import
+try:
+    from src.web.app import run_server as run_web_server
+    WEB_AVAILABLE = True
+except ImportError:
+    WEB_AVAILABLE = False
+
 # Load environment variables from .env file in project root
 project_root = Path(__file__).parent.parent
 load_dotenv(project_root / '.env')
@@ -82,6 +89,12 @@ def cli():
     type=click.Choice(['Basic', 'Standard', 'Comprehensive']),
     default='Standard',
     help='Audit detail level'
+)
+@click.option(
+    '--profile',
+    type=click.Choice(['wifi', 'protocols', 'system', 'security', 'network', 'containers']),
+    default=None,
+    help='Thematic audit profile (overrides --audit-level)'
 )
 @click.option(
     '--output-dir',
@@ -169,6 +182,7 @@ def main(
     ssh_key_file: Optional[str],
     ssh_key_passphrase: Optional[str],
     audit_level: str,
+    profile: Optional[str],
     output_dir: Optional[str],
     skip_security: bool,
     max_workers: int,
@@ -227,12 +241,14 @@ def main(
                     timeout_per_command=timeout_per_command,
                 ),
                 audit_level=AuditLevel(audit_level),
+                audit_profile=profile,
                 output_dir=output_dir,
                 skip_security_check=skip_security,
                 max_workers=max_workers,
                 redact_sensitive=redact,
                 output_formats=[f.strip().lower() for f in output_formats.split(',')],
                 enable_cve_check=not no_cve_check,
+                enable_live_cve_lookup=True,
                 show_progress_bar=not no_progress_bar,
             )
             print_dry_run(config)
@@ -281,12 +297,14 @@ def main(
                 timeout_per_command=timeout_per_command,
             ),
             audit_level=AuditLevel(audit_level),
+            audit_profile=profile,
             output_dir=output_dir,
             skip_security_check=skip_security,
             max_workers=max_workers,
             redact_sensitive=redact,
             output_formats=[f.strip().lower() for f in output_formats.split(',')],
             enable_cve_check=not no_cve_check,
+            enable_live_cve_lookup=True,
             show_progress_bar=not no_progress_bar,
         )
 
@@ -593,6 +611,20 @@ def diff(report1: str, report2: str, output: Optional[str]):
     except Exception as e:
         click.echo(f"{Fore.RED}Error: {e}{Style.RESET_ALL}", err=True)
         sys.exit(1)
+
+
+@cli.command(name='web-server')
+@click.option('--host', default='127.0.0.1', help='Host to bind to')
+@click.option('--port', default=5000, type=int, help='Port to listen on')
+@click.option('--debug', is_flag=True, help='Enable debug mode')
+def web_server(host, port, debug):
+    """Start web interface."""
+    if not WEB_AVAILABLE:
+        click.echo(f"{Fore.RED}Error: Web interface dependencies not installed.{Style.RESET_ALL}", err=True)
+        click.echo("Install with: pip install flask flask-cors", err=True)
+        sys.exit(1)
+
+    run_web_server(host=host, port=port, debug=debug)
 
 
 if __name__ == '__main__':

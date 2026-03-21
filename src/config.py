@@ -53,12 +53,14 @@ class RouterConfig(BaseModel):
 class AuditConfig(BaseModel):
     router: RouterConfig = Field(default_factory=RouterConfig)
     audit_level: AuditLevel = Field(default=AuditLevel.STANDARD)
+    audit_profile: Optional[str] = None  # Thematic audit profile: wifi, protocols, system, security, network, containers
     skip_security_check: bool = False
     output_dir: Optional[str] = None
     max_workers: int = 0  # 0 = auto-calculate optimal workers based on command count
     redact_sensitive: bool = False  # Маскирование чувствительных данных (PPP-секреты, пароли, серийный номер)
     output_formats: list = Field(default_factory=lambda: ["html", "json"])  # Report formats to generate
     enable_cve_check: bool = True  # Check RouterOS version against CVE database
+    enable_live_cve_lookup: bool = True  # Use live NIST NVD API for CVE lookup (with 24h caching)
     show_progress_bar: bool = True  # Show tqdm progress bar instead of verbose logs
 
 class CommandResult(BaseModel):

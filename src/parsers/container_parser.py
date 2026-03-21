@@ -25,7 +25,9 @@ CONTAINER_FIELD_MAP = {
     'ip-address': 'ip_address',
     'creation-time': 'created',
     'started': 'started',
-    'uptime': 'uptime'
+    'uptime': 'uptime',
+    'netmask': 'netmask',
+    'bridge': 'bridge'
 }
 
 
@@ -49,6 +51,87 @@ def _set_container_field(container: Container, key: str, value: str) -> None:
         setattr(container, field, value)
     if key == 'root-directory':
         container.root_dir = value
+    # Handle privileged flag
+    if key == 'privileged':
+        container.privileged = value.lower() in ('yes', 'true', '1')
+
+
+def parse_container_mounts(results: List) -> dict:
+    """
+    Parse container mounts from /container mounts print detail.
+
+    Returns dict mapping container name -> list of mounts.
+    RouterOS format:
+      0 name="mycontainer" src="/flash/container-data" dst="/data"
+    """
+    mounts_by_container: dict = {}
+
+    if not results or results[0].has_error:
+        return mounts_by_container
+
+    output = results[0].stdout
+
+    for line in output.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('Flags:'):
+            continue
+
+        # Parse mount entry
+        name_match = re.search(r'name=["\']?([^"\'\s]+)["\']?', line)
+        src_match = re.search(r'src=["\']?([^"\'\s]+)["\']?', line)
+        dst_match = re.search(r'dst=["\']?([^"\'\s]+)["\']?', line)
+
+        if name_match:
+            container_name = name_match.group(1)
+            if container_name not in mounts_by_container:
+                mounts_by_container[container_name] = []
+
+            mount_info = {
+                'src': src_match.group(1) if src_match else '',
+                'dst': dst_match.group(1) if dst_match else ''
+            }
+            mounts_by_container[container_name].append(mount_info)
+
+    return mounts_by_container
+
+
+def parse_container_envs(results: List) -> dict:
+    """
+    Parse container environment variables from /container envs print detail.
+
+    Returns dict mapping container name -> list of env vars.
+    RouterOS format:
+      0 name="mycontainer" key="ENV_VAR" value="secret_value"
+    """
+    envs_by_container: dict = {}
+
+    if not results or results[0].has_error:
+        return envs_by_container
+
+    output = results[0].stdout
+
+    for line in output.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('Flags:'):
+            continue
+
+        # Parse env entry
+        name_match = re.search(r'name=["\']?([^"\'\s]+)["\']?', line)
+        key_match = re.search(r'key=["\']?([^"\'\s]+)["\']?', line)
+        value_match = re.search(r'value=["\']?([^"\']*)["\']?', line)
+
+        if name_match and key_match:
+            container_name = name_match.group(1)
+            if container_name not in envs_by_container:
+                envs_by_container[container_name] = []
+
+            env_info = {
+                'key': key_match.group(1),
+                'value': value_match.group(1) if value_match else ''
+            }
+            envs_by_container[container_name].append(env_info)
+
+    return envs_by_container
 
 
 def parse_containers(results: List) -> Tuple[List[Container], NetworkOverview]:

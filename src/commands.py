@@ -1,5 +1,113 @@
 """Audit command definitions for MikroTik routers."""
 
+# ===== AUDIT PROFILES (1.6) =====
+# Thematic command sets for focused auditing
+
+# Wi-Fi profile: wireless security and configuration
+AUDIT_PROFILE_WIFI = [
+    "/interface wifi print detail",
+    "/interface wifi security print detail",
+    "/interface wifi registration-table print detail",
+    "/interface wifi cap print detail",
+    "/interface wireless print detail",  # Legacy
+]
+
+# Protocols profile: network services and protocols
+AUDIT_PROFILE_PROTOCOLS = [
+    # SNMP
+    "/snmp print",
+    "/snmp community print detail",
+    # UPnP
+    "/ip upnp print",
+    "/ip upnp interfaces print detail",
+    # Proxy
+    "/ip proxy print",
+    "/ip proxy access print",
+    # RoMON
+    "/tool romon print",
+    # Services
+    "/ip service print detail",
+    "/ip ssh print",
+    # DNS
+    "/ip dns print",
+    "/ip dns static print detail",
+    # DHCP
+    "/ip dhcp-server print",
+    "/ip dhcp-server network print detail",
+    "/ip dhcp-server lease print detail",
+]
+
+# System profile: system-level configuration
+AUDIT_PROFILE_SYSTEM = [
+    "/system identity print",
+    "/system package print",
+    "/system resource print",
+    "/system clock print",
+    "/system routerboard print",
+    "/system license print",
+    "/system logging print detail",
+    "/system health print",
+    "/system scheduler print detail",
+    "/system script print detail",
+    "/system certificate print",
+    "/system note print",
+    "/user print detail",
+    "/user group print detail",
+]
+
+# Security profile: firewall and security settings
+AUDIT_PROFILE_SECURITY = [
+    # Firewall
+    "/ip firewall filter print detail without-paging",
+    "/ip firewall nat print detail without-paging",
+    "/ip firewall mangle print detail without-paging",
+    "/ip firewall raw print detail",
+    "/ip firewall address-list print detail",
+    # IPv6
+    "/ipv6 firewall filter print detail",
+    # Services security
+    "/ip service print detail",
+    "/ip ssh print",
+    # VPN
+    "/interface wireguard print detail",
+    "/interface wireguard peers print detail",
+    "/ip ipsec peer print detail",
+    "/ip ipsec policy print detail",
+]
+
+# Network profile: interfaces and routing
+AUDIT_PROFILE_NETWORK = [
+    "/interface print detail",
+    "/interface print stats",
+    "/interface list print detail",
+    "/interface list member print detail",
+    "/ip address print detail",
+    "/ip route print detail",
+    "/ip arp print detail",
+    "/ip neighbor print detail",
+    "/interface bridge print detail",
+    "/interface bridge port print detail",
+    "/interface bridge vlan print detail",
+]
+
+# Containers profile: container management
+AUDIT_PROFILE_CONTAINERS = [
+    "/container print detail",
+    "/container config print",
+    "/container mounts print detail",
+    "/container envs print detail",
+]
+
+# Profile mapping
+AUDIT_PROFILES = {
+    "wifi": AUDIT_PROFILE_WIFI,
+    "protocols": AUDIT_PROFILE_PROTOCOLS,
+    "system": AUDIT_PROFILE_SYSTEM,
+    "security": AUDIT_PROFILE_SECURITY,
+    "network": AUDIT_PROFILE_NETWORK,
+    "containers": AUDIT_PROFILE_CONTAINERS,
+}
+
 # Standard RouterOS audit commands
 AUDIT_COMMANDS_BASIC = [
     "/system identity print",
@@ -319,6 +427,17 @@ AUDIT_COMMANDS_COMPREHENSIVE = [
     "/ip hotspot user print",
     "/ip proxy print",
     "/ip proxy access print",
+
+    # SNMP
+    "/snmp print",
+    "/snmp community print detail",
+
+    # UPnP
+    "/ip upnp print",
+    "/ip upnp interfaces print detail",
+
+    # RoMON
+    "/tool romon print",
 
     # Services & SSH
     "/ip service print detail",
