@@ -149,9 +149,9 @@ class TestIoCAnalyzer:
             {'mac_address': 'AA:BB:CC:DD:EE:FF', 'address': '192.168.1.100'},  # Same MAC!
             {'mac_address': '11:22:33:44:55:66', 'address': '192.168.1.2'}  # Different MAC
         ]
-        
+
         iocs = analyzer._check_arp_spoofing()
-        
+
         assert len(iocs) > 0
         assert iocs[0].ioc_type == IoCType.ARP_SPOOFING
 
